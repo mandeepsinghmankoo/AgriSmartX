@@ -23,16 +23,20 @@ try:
 except ImportError:
     TF_AVAILABLE = False
 
-# Load model only if tensorflow is available
+# Load model lazily on first request to avoid startup memory spike
 MODEL_PATH = Path(
     os.getenv("MODEL_PATH", str(Path(settings.BASE_DIR).parent / "farm_equipment_model.h5"))
 )
-model = None
-if TF_AVAILABLE and MODEL_PATH.exists():
-    try:
-        model = tf.keras.models.load_model(str(MODEL_PATH))
-    except Exception:
-        model = None
+_model = None
+
+def get_model():
+    global _model
+    if _model is None and TF_AVAILABLE and MODEL_PATH.exists():
+        try:
+            _model = tf.keras.models.load_model(str(MODEL_PATH))
+        except Exception as e:
+            print(f"Model load error: {e}")
+    return _model
 # Class names (must match your dataset)
 classes = [
     "combine_harvester",
@@ -50,6 +54,8 @@ def detect_equipment(request):
         return JsonResponse({"error": "TensorFlow not installed on this server. ML detection unavailable."}, status=503)
     if not CV2_AVAILABLE:
         return JsonResponse({"error": "OpenCV not installed on this server."}, status=503)
+
+    model = get_model()
     if model is None:
         return JsonResponse({"error": f"Model file not found at: {MODEL_PATH}"}, status=500)
 

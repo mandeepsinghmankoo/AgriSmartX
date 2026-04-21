@@ -27,9 +27,10 @@ export default function BuyerDashboard() {
   const unread = notifications.filter(n => !n.is_read).length
 
   const TABS = [
-    { id: 'overview',      label: 'Overview', icon: '📊' },
-    { id: 'shop',          label: 'Shop',     icon: '🛍️' },
-    { id: 'notifications', label: 'Alerts',   icon: '🔔', count: unread, highlight: unread > 0 },
+    { id: 'overview',      label: 'Overview',  icon: '📊' },
+    { id: 'crop_feed',     label: 'Crop Feed', icon: '🌽' },
+    { id: 'shop',          label: 'Shop',      icon: '🛍️' },
+    { id: 'notifications', label: 'Alerts',    icon: '🔔', count: unread, highlight: unread > 0 },
   ]
 
   if (loading) return <Loader />
@@ -66,6 +67,17 @@ export default function BuyerDashboard() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === 'crop_feed' && (
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: '56px', marginBottom: '16px' }}>🌽</div>
+          <h3 style={{ color: '#f1f5f9', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>Buy Crops in Bulk</h3>
+          <p style={{ color: '#475569', fontSize: '14px', marginBottom: '24px' }}>Browse fresh crop listings directly from farmers and express your interest</p>
+          <Link to="/crop-sales" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block', padding: '12px 28px', background: 'linear-gradient(135deg,#86efac,#4ade80)', color: '#0f172a' }}>
+            Browse Crop Feed →
+          </Link>
         </div>
       )}
 

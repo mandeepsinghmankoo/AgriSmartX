@@ -93,22 +93,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
-              style={{
-                background: 'linear-gradient(135deg, #d4a0a0, #a77474)',
-                color: '#0f0a0a',
-                boxShadow: '0 0 16px rgba(167, 116, 116,0.4)',
-              }}
-            >
-              A
-            </div>
-            <span
-              className="text-lg font-bold tracking-tight"
-              style={{ color: '#f1f5f9' }}
-            >
-              Agri<span className="gradient-text">SmartX</span>
-            </span>
+            <img className='w-60' src="./../../../public/LOGO.png" alt="" />
           </Link>
 
           {/* Desktop Nav */}

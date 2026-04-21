@@ -13,6 +13,8 @@ import MyBookings from './pages/MyBookings'
 import Profile from './pages/Profile'
 import Dashboard from './pages/Dashboard'
 import Marketplace from './pages/Marketplace'
+import CropSales from './pages/CropSales'
+import PostCrop from './pages/PostCrop'
 
 // Alternating brown-rose and aqua particles
 const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
@@ -58,6 +60,7 @@ const ROLE_ACCESS = {
   '/create-listing': ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'dealer'],
   '/my-bookings':    ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'dealer'],
   '/dashboard':      ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'dealer'],
+  '/post-crop':      ['farmer'],
 }
 
 function RoleRoute({ path, children }) {
@@ -87,6 +90,8 @@ function App() {
             <Route path="/my-bookings" element={<RoleRoute path="/my-bookings"><MyBookings /></RoleRoute>} />
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
             <Route path="/dashboard" element={<RoleRoute path="/dashboard"><Dashboard /></RoleRoute>} />
+            <Route path="/crop-sales" element={<PrivateRoute><CropSales /></PrivateRoute>} />
+            <Route path="/post-crop" element={<RoleRoute path="/post-crop"><PostCrop /></RoleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

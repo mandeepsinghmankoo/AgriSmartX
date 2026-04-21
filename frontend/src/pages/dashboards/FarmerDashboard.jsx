@@ -20,6 +20,7 @@ const QUICK_ACTIONS = [
   { to: '/listings?type=land',      icon: '🌾', label: 'Lease Land',     color: '#86efac', glow: 'rgba(134,239,172,0.1)' },
   { to: '/listings?type=labor',     icon: '👨🌾', label: 'Hire Labor',   color: '#fbbf24', glow: 'rgba(251,191,36,0.1)' },
   { to: '/listings?type=livestock', icon: '🐄', label: 'Buy Livestock',  color: '#f97316', glow: 'rgba(249,115,22,0.1)' },
+  { to: '/crop-sales',              icon: '🌽', label: 'Sell Crops',     color: '#4ade80', glow: 'rgba(74,222,128,0.1)' },
 ]
 
 export default function FarmerDashboard() {
@@ -46,6 +47,7 @@ export default function FarmerDashboard() {
   const TABS = [
     { id: 'overview',      label: 'Overview',     icon: '📊' },
     { id: 'my_listings',   label: 'My Listings',  icon: '📋', count: listings.length },
+    { id: 'crop_sales',    label: 'Crop Sales',   icon: '🌽' },
     { id: 'bookings',      label: 'My Bookings',  icon: '🛒', count: myBookings.length },
     { id: 'requests',      label: 'Requests',     icon: '📥', count: receivedRequests.filter(b => b.status === 'pending').length, highlight: receivedRequests.filter(b => b.status === 'pending').length > 0 },
     { id: 'notifications', label: 'Alerts',       icon: '🔔', count: unread, highlight: unread > 0 },
@@ -95,6 +97,17 @@ export default function FarmerDashboard() {
       )}
 
       {tab === 'bookings' && <BookingsList bookings={myBookings} emptyMsg="No bookings yet" emptyLink="/listings" emptyAction="Browse Listings →" />}
+      {tab === 'crop_sales' && (
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: '56px', marginBottom: '16px' }}>🌽</div>
+          <h3 style={{ color: '#f1f5f9', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>Bulk Crop Sales</h3>
+          <p style={{ color: '#475569', fontSize: '14px', marginBottom: '24px' }}>Post your harvest for bulk sale and manage buyer requests</p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link to="/post-crop" className="btn-primary" style={{ textDecoration: 'none', padding: '11px 24px', background: 'linear-gradient(135deg,#86efac,#4ade80)', color: '#0f172a' }}>+ Post Crop</Link>
+            <Link to="/crop-sales" className="btn-ghost" style={{ textDecoration: 'none', padding: '11px 24px' }}>View My Posts →</Link>
+          </div>
+        </div>
+      )}
       {tab === 'requests' && (
         <ReceivedRequests bookings={receivedRequests} setBookings={setBookings} />
       )}

@@ -1,5 +1,5 @@
 // src/pages/CreateListing.jsx
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createListing } from '../lib/listings'
 import { uploadMultiple } from '../lib/storage'
@@ -120,6 +120,61 @@ function Grid({ children }) {
   )
 }
 
+// ── Camera Modal ──
+function CameraModal({ onCapture, onClose }) {
+  const videoRef = useRef(null)
+  const [stream, setStream] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then((s) => { setStream(s); videoRef.current.srcObject = s })
+      .catch(() => setError('Camera access denied or not available.'))
+    return () => stream?.getTracks().forEach((t) => t.stop())
+  }, [])
+
+  function capture() {
+    const canvas = document.createElement('canvas')
+    canvas.width = videoRef.current.videoWidth
+    canvas.height = videoRef.current.videoHeight
+    canvas.getContext('2d').drawImage(videoRef.current, 0, 0)
+    canvas.toBlob((blob) => {
+      const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' })
+      stream?.getTracks().forEach((t) => t.stop())
+      onCapture(file)
+    }, 'image/jpeg', 0.92)
+  }
+
+  function close() {
+    stream?.getTracks().forEach((t) => t.stop())
+    onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#0f172a', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {error ? (
+          <p style={{ color: '#f87171', textAlign: 'center', padding: '20px' }}>{error}</p>
+        ) : (
+          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '12px', background: '#000' }} />
+        )}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button type="button" onClick={close}
+            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>
+            Cancel
+          </button>
+          {!error && (
+            <button type="button" onClick={capture} className="btn-primary"
+              style={{ flex: 2, padding: '12px', borderRadius: '12px', fontSize: '15px' }}>
+              📸 Capture
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ──
 
 export default function CreateListing() {
@@ -146,6 +201,7 @@ export default function CreateListing() {
   const [images, setImages] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showCamera, setShowCamera] = useState(false)
 
   const set = (k) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
@@ -450,20 +506,40 @@ export default function CreateListing() {
 
         {/* ── Photos ── */}
         <Section title="Photos">
-          <label
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              padding: '32px', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '16px',
-              cursor: 'pointer', transition: 'all 0.2s', background: 'rgba(255,255,255,0.02)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(167,116,116,0.3)'; e.currentTarget.style.background = 'rgba(167,116,116,0.03)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
-          >
-            <span style={{ fontSize: '32px', marginBottom: '8px' }}>📸</span>
-            <span style={{ color: '#64748b', fontSize: '14px', fontWeight: 500 }}>Click to upload photos</span>
-            <span style={{ color: '#334155', fontSize: '12px', marginTop: '4px' }}>PNG, JPG up to 10MB each</span>
-            <input type="file" accept="image/*" multiple onChange={(e) => setImages(Array.from(e.target.files))} style={{ display: 'none' }} />
-          </label>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+            <label
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '32px', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '16px',
+                cursor: 'pointer', transition: 'all 0.2s', background: 'rgba(255,255,255,0.02)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(167,116,116,0.3)'; e.currentTarget.style.background = 'rgba(167,116,116,0.03)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+            >
+              <span style={{ fontSize: '32px', marginBottom: '8px' }}>📸</span>
+              <span style={{ color: '#64748b', fontSize: '14px', fontWeight: 500 }}>Click to upload photos</span>
+              <span style={{ color: '#334155', fontSize: '12px', marginTop: '4px' }}>PNG, JPG up to 10MB each</span>
+              <input type="file" accept="image/*" multiple onChange={(e) => setImages(prev => [...prev, ...Array.from(e.target.files)])} style={{ display: 'none' }} />
+            </label>
+            <button type="button" onClick={() => setShowCamera(true)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '20px 24px', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '16px',
+                cursor: 'pointer', transition: 'all 0.2s', background: 'rgba(255,255,255,0.02)', gap: '8px',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(96,165,250,0.4)'; e.currentTarget.style.background = 'rgba(96,165,250,0.05)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+            >
+              <span style={{ fontSize: '28px' }}>📷</span>
+              <span style={{ color: '#60a5fa', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>Camera</span>
+            </button>
+            {showCamera && (
+              <CameraModal
+                onCapture={(file) => { setImages((prev) => [...prev, file]); setShowCamera(false) }}
+                onClose={() => setShowCamera(false)}
+              />
+            )}
+          </div>
           {images.length > 0 && (
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {images.map((f, i) => (

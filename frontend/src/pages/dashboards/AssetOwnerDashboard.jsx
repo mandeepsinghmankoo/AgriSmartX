@@ -8,6 +8,7 @@ import { getNotifications } from '../../lib/notifications'
 import { supabase } from '../../lib/supabase'
 import { formatPrice, formatDate, timeAgo } from '../../lib/utils'
 import { Loader, DashboardShell, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import ChatPanel from '../../components/common/ChatPanel'
 
 const SS = {
   pending:   { bg: 'rgba(245,158,11,0.1)',  color: '#fbbf24', border: 'rgba(245,158,11,0.2)' },
@@ -26,7 +27,8 @@ export default function AssetOwnerDashboard() {
   const [notifications, setNotifications] = useState([])
   const [tab, setTab]                 = useState('overview')
   const [loading, setLoading]         = useState(true)
-  const [assetFilter, setAssetFilter] = useState('all') // 'all' | 'equipment' | 'livestock'
+  const [assetFilter, setAssetFilter] = useState('all')
+  const [chatBooking, setChatBooking] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -55,6 +57,8 @@ export default function AssetOwnerDashboard() {
     await updateBookingStatus(bookingId, status)
     setBookings(bs => bs.map(b => b.booking_id === bookingId ? { ...b, status } : b))
   }
+
+  function openChat(b) { setChatBooking(b) }
 
   const myAssets    = listings.filter(l => ['equipment', 'livestock'].includes(l.type))
   const filtered    = assetFilter === 'all' ? myAssets : myAssets.filter(l => l.type === assetFilter)
@@ -112,9 +116,12 @@ export default function AssetOwnerDashboard() {
                     </div>
                     <span style={{ color: '#d4a0a0', fontWeight: 700, fontSize: '16px' }}>{formatPrice(b.grand_total || b.total_amount)}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
-                    <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button onClick={() => openChat(b)} style={{ width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>💬 Chat with Buyer</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
+                      <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -211,17 +218,18 @@ export default function AssetOwnerDashboard() {
                   </div>
                   <span style={{ color: '#d4a0a0', fontWeight: 700, fontSize: '16px' }}>{formatPrice(b.grand_total || b.total_amount)}</span>
                 </div>
-                {b.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
-                    <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
-                  </div>
-                )}
-                {b.status === 'approved' && (
-                  <button onClick={() => handleStatus(b.booking_id, 'completed')} style={{ width: '100%', padding: '8px', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-                    ✔ Mark Completed
-                  </button>
-                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                  <button onClick={() => openChat(b)} style={{ width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>💬 Chat with Buyer</button>
+                  {b.status === 'pending' && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
+                      <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                    </div>
+                  )}
+                  {b.status === 'approved' && (
+                    <button onClick={() => handleStatus(b.booking_id, 'completed')} style={{ width: '100%', padding: '8px', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>✔ Mark Completed</button>
+                  )}
+                </div>
               </div>
             )
           })}
@@ -255,6 +263,7 @@ export default function AssetOwnerDashboard() {
       )}
 
       {tab === 'notifications' && <NotificationsList notifications={notifications} setNotifications={setNotifications} />}
+      {chatBooking && <ChatPanel booking={chatBooking} onClose={() => setChatBooking(null)} />}
     </DashboardShell>
   )
 }

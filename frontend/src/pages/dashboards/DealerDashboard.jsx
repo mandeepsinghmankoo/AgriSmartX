@@ -8,6 +8,7 @@ import { getNotifications } from '../../lib/notifications'
 import { supabase } from '../../lib/supabase'
 import { formatPrice, timeAgo } from '../../lib/utils'
 import { Loader, DashboardShell, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import ChatPanel from '../../components/common/ChatPanel'
 
 export default function DealerDashboard() {
   const { user, profile } = useAuth()
@@ -16,6 +17,7 @@ export default function DealerDashboard() {
   const [notifications, setNotifications] = useState([])
   const [tab, setTab] = useState('overview')
   const [loading, setLoading] = useState(true)
+  const [chatBooking, setChatBooking] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -51,6 +53,8 @@ export default function DealerDashboard() {
     await updateBookingStatus(bookingId, status)
     setBookings((bs) => bs.map((b) => b.booking_id === bookingId ? { ...b, status } : b))
   }
+
+  function openChat(b) { setChatBooking(b) }
 
   const TABS = [
     { id: 'overview',      label: 'Overview',    icon: '📊' },
@@ -112,9 +116,12 @@ export default function DealerDashboard() {
                     </div>
                     <span style={{ color: '#d4a0a0', fontWeight: 700 }}>{formatPrice(b.grand_total || b.total_amount)}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Confirm Sale</button>
-                    <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button onClick={() => openChat(b)} style={{ width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>💬 Chat with Buyer</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Confirm Sale</button>
+                      <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -167,9 +174,12 @@ export default function DealerDashboard() {
                 <span style={{ color: '#d4a0a0', fontWeight: 700 }}>{formatPrice(b.grand_total || b.total_amount)}</span>
               </div>
               {b.status === 'pending' && (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Confirm</button>
-                  <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button onClick={() => openChat(b)} style={{ width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>💬 Chat with Buyer</button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Confirm</button>
+                    <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -198,6 +208,7 @@ export default function DealerDashboard() {
       )}
 
       {tab === 'notifications' && <NotificationsList notifications={notifications} setNotifications={setNotifications} />}
+      {chatBooking && <ChatPanel booking={chatBooking} onClose={() => setChatBooking(null)} />}
     </DashboardShell>
   )
 }

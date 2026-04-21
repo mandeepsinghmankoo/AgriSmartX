@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { getMyBookings, updateBookingStatus } from '../lib/bookings'
 import { useAuth } from '../contexts/AuthContext'
 import { formatPrice, formatDate } from '../lib/utils'
+import ChatPanel from '../components/common/ChatPanel'
 
 const STATUS_STYLE = {
   pending: { bg: 'rgba(245,158,11,0.1)', color: '#fbbf24', border: 'rgba(245,158,11,0.2)', dot: '#f59e0b' },
@@ -19,6 +20,7 @@ export default function MyBookings() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('buyer')
   const [actionLoading, setActionLoading] = useState(null)
+  const [chatBooking, setChatBooking] = useState(null)
 
   useEffect(() => {
     getMyBookings().then(setBookings).catch(() => {}).finally(() => setLoading(false))
@@ -158,19 +160,27 @@ export default function MyBookings() {
                     </button>
                   </div>
                 )}
-                {tab === 'buyer' && b.status === 'pending' && (
-                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                {/* Chat button — available once booking exists */}
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setChatBooking(b)}
+                    style={{ padding: '8px 18px', borderRadius: '10px', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    💬 Chat with {tab === 'buyer' ? 'Owner' : 'Buyer'}
+                  </button>
+                  {tab === 'buyer' && b.status === 'pending' && (
                     <button onClick={() => handleStatus(b.booking_id, 'cancelled')} disabled={!!actionLoading} className="btn-danger"
                       style={{ padding: '8px 20px', borderRadius: '10px' }}>
                       Cancel Request
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )
           })}
         </div>
       )}
+      {chatBooking && <ChatPanel booking={chatBooking} onClose={() => setChatBooking(null)} />}
     </div>
   )
 }

@@ -345,6 +345,17 @@ const STATUS_STYLE = {
 }
 
 function MyRequestsList({ bookings }) {
+  function openChat(b) {
+    const params = new URLSearchParams({
+      listing_id: b.listing_id || '',
+      booking_id: b.booking_id,
+      owner_id:   b.owner_id,
+      owner_name: b.owner_name || 'Owner',
+      buyer_name: b.buyer_name || 'Buyer',
+      title:      b.listing_type || 'Listing',
+    })
+    window.open(`/chat?${params}`, `chat_${b.booking_id}`, 'width=420,height=680,resizable=yes')
+  }
   if (bookings.length === 0) return (
     <div style={{ textAlign: 'center', padding: '60px 20px' }}>
       <div style={{ fontSize: '48px', marginBottom: '14px' }}>🛒</div>
@@ -385,6 +396,12 @@ function MyRequestsList({ bookings }) {
                 <div style={{ color: '#334155', fontSize: '11px', marginTop: '2px' }}>{timeAgo(b.created_at)}</div>
               </div>
             </div>
+            <button
+              onClick={() => openChat(b)}
+              style={{ marginTop: '10px', width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+            >
+              💬 Chat with Owner
+            </button>
           </div>
         )
       })}

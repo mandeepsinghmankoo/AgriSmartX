@@ -16,6 +16,7 @@ import Dashboard from './pages/Dashboard'
 import Marketplace from './pages/Marketplace'
 import CropSales from './pages/CropSales'
 import PostCrop from './pages/PostCrop'
+import Chat from './pages/Chat'
 
 // Alternating brown-rose and aqua particles
 const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
@@ -94,6 +95,7 @@ function App() {
             <Route path="/dashboard" element={<RoleRoute path="/dashboard"><Dashboard /></RoleRoute>} />
             <Route path="/crop-sales" element={<PrivateRoute><CropSales /></PrivateRoute>} />
             <Route path="/post-crop" element={<RoleRoute path="/post-crop"><PostCrop /></RoleRoute>} />
+            <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

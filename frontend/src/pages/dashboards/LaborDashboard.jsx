@@ -8,6 +8,7 @@ import { getNotifications } from '../../lib/notifications'
 import { supabase } from '../../lib/supabase'
 import { formatPrice, formatDate, timeAgo } from '../../lib/utils'
 import { Loader, DashboardShell, StatCard, SectionTitle, BookingsList, NotificationsList } from './FarmerDashboard'
+import ChatPanel from '../../components/common/ChatPanel'
 
 const LABEL = { color: '#64748b', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }
 
@@ -28,6 +29,7 @@ export default function LaborDashboard() {
     languages: profile?.languages?.join(', ') || '',
   })
   const [saving, setSaving] = useState(false)
+  const [chatBooking, setChatBooking] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -60,6 +62,8 @@ export default function LaborDashboard() {
     await updateBookingStatus(bookingId, status)
     setBookings((bs) => bs.map((b) => b.booking_id === bookingId ? { ...b, status } : b))
   }
+
+  function openChat(b) { setChatBooking(b) }
 
   async function saveWorkProfile(e) {
     e.preventDefault()
@@ -143,9 +147,12 @@ export default function LaborDashboard() {
                     </div>
                     <span style={{ color: '#d4a0a0', fontWeight: 700, fontSize: '16px' }}>{formatPrice(b.grand_total || b.total_amount)}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleStatusUpdate(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Accept</button>
-                    <button onClick={() => handleStatusUpdate(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Decline</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button onClick={() => openChat(b)} style={{ width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>💬 Chat with Requester</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleStatusUpdate(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Accept</button>
+                      <button onClick={() => handleStatusUpdate(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Decline</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -206,6 +213,7 @@ export default function LaborDashboard() {
 
       {tab === 'job_requests' && <BookingsList bookings={jobRequests} emptyMsg="No job requests yet" />}
       {tab === 'notifications' && <NotificationsList notifications={notifications} setNotifications={setNotifications} />}
+      {chatBooking && <ChatPanel booking={chatBooking} onClose={() => setChatBooking(null)} />}
     </DashboardShell>
   )
 }

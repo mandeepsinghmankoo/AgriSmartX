@@ -1,5 +1,5 @@
 // src/pages/CreateListing.jsx
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createListing } from '../lib/listings'
 import { uploadMultiple } from '../lib/storage'
@@ -121,54 +121,24 @@ function Grid({ children }) {
 }
 
 // ── Camera Modal ──
-function CameraModal({ onCapture, onClose }) {
-  const videoRef = useRef(null)
-  const [stream, setStream] = useState(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then((s) => { setStream(s); videoRef.current.srcObject = s })
-      .catch(() => setError('Camera access denied or not available.'))
-    return () => stream?.getTracks().forEach((t) => t.stop())
-  }, [])
-
-  function capture() {
-    const canvas = document.createElement('canvas')
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
-    canvas.getContext('2d').drawImage(videoRef.current, 0, 0)
-    canvas.toBlob((blob) => {
-      const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' })
-      stream?.getTracks().forEach((t) => t.stop())
-      onCapture(file)
-    }, 'image/jpeg', 0.92)
-  }
-
-  function close() {
-    stream?.getTracks().forEach((t) => t.stop())
-    onClose()
-  }
-
+function CameraModal({ onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#0f172a', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {error ? (
-          <p style={{ color: '#f87171', textAlign: 'center', padding: '20px' }}>{error}</p>
-        ) : (
-          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '12px', background: '#000' }} />
-        )}
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button type="button" onClick={close}
-            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>
-            Cancel
+      <div style={{ background: '#0f172a', borderRadius: '20px', padding: '16px', width: '100%', maxWidth: '980px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <iframe
+          src="http://127.0.0.1:8000/farm/detect/"
+          title="Live Equipment Detection"
+          allow="camera; microphone"
+          style={{ width: '100%', height: '80vh', border: 'none', borderRadius: '12px', background: '#000' }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ padding: '12px 18px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}
+          >
+            Close
           </button>
-          {!error && (
-            <button type="button" onClick={capture} className="btn-primary"
-              style={{ flex: 2, padding: '12px', borderRadius: '12px', fontSize: '15px' }}>
-              📸 Capture
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -531,7 +501,9 @@ export default function CreateListing() {
               <span style={{ color: '#334155', fontSize: '12px', marginTop: '4px' }}>PNG, JPG up to 10MB each</span>
               <input type="file" accept="image/*" multiple onChange={(e) => setImages(prev => [...prev, ...Array.from(e.target.files)])} style={{ display: 'none' }} />
             </label>
-            <button type="button" onClick={() => setShowCamera(true)}
+            <button
+              type="button"
+              onClick={() => setShowCamera(true)}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 padding: '20px 24px', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '16px',
@@ -545,7 +517,6 @@ export default function CreateListing() {
             </button>
             {showCamera && (
               <CameraModal
-                onCapture={(file) => { setImages((prev) => [...prev, file]); setShowCamera(false) }}
                 onClose={() => setShowCamera(false)}
               />
             )}

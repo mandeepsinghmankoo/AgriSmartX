@@ -88,7 +88,7 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <img className="w-60" src="./../../../public/LOGO.png" alt="" />
+            <img className="w-60" src="/LOGO.png" alt="AgriSmartX" />
           </Link>
 
           {/* Desktop Nav Links */}

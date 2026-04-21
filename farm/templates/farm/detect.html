@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Farm Equipment Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 720px;
+        }
+        video, canvas {
+            width: 100%;
+            max-width: 640px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background: #000;
+        }
+        .controls {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 14px;
+            cursor: pointer;
+        }
+        #result {
+            margin-top: 16px;
+            padding: 12px;
+            background: #f4f4f4;
+            border-radius: 8px;
+            white-space: pre-line;
+        }
+        #history {
+            margin-top: 20px;
+        }
+        #historyGrid {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        .history-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .history-card img {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            display: block;
+        }
+        .history-meta {
+            padding: 8px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Live Camera Equipment Detection</h1>
+    <p>Start camera and enable live detection for continuous predictions.</p>
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div class="controls">
+        <button id="startBtn" type="button">Start Camera</button>
+        <button id="captureBtn" type="button">Capture & Detect</button>
+        <button id="liveBtn" type="button">Start Live Detection</button>
+        <button id="stopBtn" type="button">Stop Camera</button>
+    </div>
+
+    <div id="result">No prediction yet.</div>
+
+    <section id="history">
+        <h2>Previous Captures</h2>
+        <div id="historyGrid"></div>
+    </section>
+
+    <script>
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const resultBox = document.getElementById("result");
+        const startBtn = document.getElementById("startBtn");
+        const captureBtn = document.getElementById("captureBtn");
+        const liveBtn = document.getElementById("liveBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const historyGrid = document.getElementById("historyGrid");
+        let stream = null;
+        let liveIntervalId = null;
+        let detectionInFlight = false;
+
+        function renderHistory(items) {
+            if (!items.length) {
+                historyGrid.innerHTML = "<p>No saved previews yet.</p>";
+                return;
+            }
+            historyGrid.innerHTML = items.map((item) => `
+                <div class="history-card">
+                    <img src="${item.image_url}" alt="${item.label}">
+                    <div class="history-meta">
+                        <div><strong>${item.label}</strong></div>
+                        <div>${item.confidence}</div>
+                        <div>${item.created_at}</div>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch("/farm/history/");
+                const data = await response.json();
+                renderHistory(data.items || []);
+            } catch (err) {
+                historyGrid.innerHTML = "<p>Could not load previews.</p>";
+            }
+        }
+
+        async function startCamera() {
+            if (stream) {
+                return true;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                resultBox.textContent = "Camera API not supported in this browser.";
+                return false;
+            }
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                await video.play();
+                resultBox.textContent = "Camera started.";
+                return true;
+            } catch (err) {
+                resultBox.textContent = "Could not access camera: " + err.message;
+                return false;
+            }
+        }
+
+        function stopCamera() {
+            stopLiveDetection();
+            if (stream) {
+                stream.getTracks().forEach((track) => track.stop());
+                stream = null;
+                video.srcObject = null;
+                resultBox.textContent = "Camera stopped.";
+            }
+        }
+
+        async function captureAndDetect() {
+            if (!stream || detectionInFlight) {
+                if (!stream) {
+                    resultBox.textContent = "Start camera first.";
+                }
+                return;
+            }
+
+            const width = video.videoWidth || 640;
+            const height = video.videoHeight || 480;
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, width, height);
+
+            detectionInFlight = true;
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    resultBox.textContent = "Failed to capture image.";
+                    detectionInFlight = false;
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append("image", blob, "camera_capture.jpg");
+
+                resultBox.textContent = "Detecting...";
+
+                try {
+                    const response = await fetch("/farm/detect/", {
+                        method: "POST",
+                        body: formData
+                    });
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        resultBox.textContent = "Error: " + (data.error || "Unknown error");
+                        return;
+                    }
+
+                    resultBox.textContent = `Prediction: ${data.label}\nConfidence: ${data.confidence}`;
+                    await loadHistory();
+                } catch (err) {
+                    resultBox.textContent = "Request failed: " + err.message;
+                } finally {
+                    detectionInFlight = false;
+                }
+            }, "image/jpeg");
+        }
+
+        async function startLiveDetection() {
+            if (!stream) {
+                const started = await startCamera();
+                if (!started) {
+                    return;
+                }
+            }
+            if (liveIntervalId) {
+                return;
+            }
+            liveBtn.textContent = "Live Detection Running...";
+            liveIntervalId = setInterval(() => {
+                captureAndDetect();
+            }, 1200);
+        }
+
+        function stopLiveDetection() {
+            if (liveIntervalId) {
+                clearInterval(liveIntervalId);
+                liveIntervalId = null;
+                liveBtn.textContent = "Start Live Detection";
+            }
+        }
+
+        startBtn.addEventListener("click", async () => {
+            await startCamera();
+        });
+        stopBtn.addEventListener("click", stopCamera);
+        captureBtn.addEventListener("click", captureAndDetect);
+        liveBtn.addEventListener("click", async () => {
+            if (liveIntervalId) {
+                stopLiveDetection();
+                resultBox.textContent = "Live detection stopped.";
+            } else {
+                await startLiveDetection();
+                if (liveIntervalId) {
+                    resultBox.textContent = "Live detection started.";
+                }
+            }
+        });
+
+        loadHistory();
+    </script>
+</body>
+</html>

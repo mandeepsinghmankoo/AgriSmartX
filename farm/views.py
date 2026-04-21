@@ -10,11 +10,13 @@ import tensorflow as tf
 from pathlib import Path
 from uuid import uuid4
 from .models import DetectionHistory
+import os
 
 # Load the trained model once, but don't crash app startup if missing
-MODEL_PATH = Path(r"E:\FarmX\AgriSmartX\farm_equipment_model.h5")
+MODEL_PATH = Path(
+    os.getenv("MODEL_PATH", str(Path(settings.BASE_DIR).parent / "farm_equipment_model.h5"))
+)
 model = tf.keras.models.load_model(str(MODEL_PATH)) if MODEL_PATH.exists() else None
-
 # Class names (must match your dataset)
 classes = [
     "combine_harvester",

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Navbar from './components/common/Navbar'
 import Footer from './components/common/Footer'
+import NotificationToast from './components/common/NotificationToast'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -57,9 +58,9 @@ function PrivateRoute({ children }) {
 }
 
 const ROLE_ACCESS = {
-  '/create-listing': ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'dealer'],
-  '/my-bookings':    ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'dealer'],
-  '/dashboard':      ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'dealer'],
+  '/create-listing': ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'asset_owner', 'dealer'],
+  '/my-bookings':    ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'asset_owner', 'dealer', 'buyer'],
+  '/dashboard':      ['farmer', 'labor', 'equipment_owner', 'livestock_owner', 'dealer', 'asset_owner', 'buyer'],
   '/post-crop':      ['farmer'],
 }
 
@@ -75,6 +76,7 @@ function App() {
   return (
     <>
       <GlobalBackground />
+      <NotificationToast />
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 }}>
         <Navbar />
         <main style={{ flex: 1, maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '32px 20px' }}>

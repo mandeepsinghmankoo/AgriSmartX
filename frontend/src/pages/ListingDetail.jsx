@@ -29,7 +29,7 @@ export default function ListingDetail() {
 
   useEffect(() => {
     getListing(id).then((d) => { setListing(d); setLoading(false) }).catch(() => setLoading(false))
-    getListingReviews(id).then(setReviews).catch(() => {})
+    getListingReviews(id).then(setReviews).catch(() => setReviews([]))
   }, [id])
 
   async function handleBook(e) {
@@ -42,13 +42,18 @@ export default function ListingDetail() {
         : 1
       const total = listing.price * days * booking.quantity
       await createBooking({
-        listing_id: listing.id, listing_type: listing.type,
+        listing_id: listing.id,           // uuid FK required by bookings table
+        listing_type: listing.type,
         owner_id: listing.owner_id, owner_name: listing.owner_name,
-        start_date: booking.start_date, end_date: booking.end_date,
+        // only include dates if both are filled — never send empty strings to timestamp columns
+        ...(booking.start_date && booking.end_date
+          ? { start_date: booking.start_date, end_date: booking.end_date }
+          : {}),
         duration: days, quantity: booking.quantity,
         unit_price: listing.price, total_amount: total,
         service_charge: total * 0.05, grand_total: total * 1.05,
-        special_instructions: booking.special_instructions,
+        // only include if not empty
+        ...(booking.special_instructions ? { special_instructions: booking.special_instructions } : {}),
       })
       setBookingSuccess(true)
     } catch (err) { setBookingError(err.message) }
@@ -122,7 +127,7 @@ export default function ListingDetail() {
               <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, lineHeight: 1.3 }}>{listing.title}</h1>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ color: '#d4a0a0', fontSize: '24px', fontWeight: 800 }}>{formatPrice(listing.price)}</div>
-                <div style={{ color: '#475569', fontSize: '12px' }}>per {listing.price_unit}</div>
+                <div style={{ color: '#475569', fontSize: '12px' }}>{listing.rent_or_sell === 'sell' ? 'Fixed Price' : `per ${listing.price_unit}`}</div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -236,7 +241,7 @@ export default function ListingDetail() {
                 <div style={{ background: 'rgba(167, 116, 116,0.04)', border: '1px solid rgba(167, 116, 116,0.1)', borderRadius: '12px', padding: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ color: '#64748b', fontSize: '13px' }}>Price</span>
-                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>{formatPrice(listing.price)}/{listing.price_unit}</span>
+                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>{formatPrice(listing.price)}{listing.rent_or_sell !== 'sell' && `/${listing.price_unit}`}</span>
                   </div>
                   {booking.start_date && booking.end_date && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>

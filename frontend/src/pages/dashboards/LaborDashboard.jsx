@@ -38,6 +38,20 @@ export default function LaborDashboard() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`labor_bookings_${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `owner_id=eq.${user.id}` },
+        (payload) => setBookings(prev => [payload.new, ...prev])
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `owner_id=eq.${user.id}` },
+        (payload) => setBookings(prev => prev.map(b => b.booking_id === payload.new.booking_id ? payload.new : b))
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [user])
+
   const jobRequests = bookings.filter((b) => b.owner_id === user?.id)
   const unread = notifications.filter((n) => !n.is_read).length
   const myProfile = listings.find((l) => l.type === 'labor')

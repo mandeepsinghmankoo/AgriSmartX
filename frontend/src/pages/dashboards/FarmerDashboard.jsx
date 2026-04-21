@@ -4,8 +4,9 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { getMyBookings } from '../../lib/bookings'
 import { getMyListings, deleteListing } from '../../lib/listings'
-import { getNotifications, markAllRead } from '../../lib/notifications'
+import { getNotifications, markAllRead, markRead } from '../../lib/notifications'
 import { formatPrice, formatDate, timeAgo } from '../../lib/utils'
+import { supabase } from '../../lib/supabase'
 
 const SS = {
   pending:   { bg: 'rgba(245,158,11,0.1)',  color: '#fbbf24', border: 'rgba(245,158,11,0.2)' },
@@ -39,6 +40,25 @@ export default function FarmerDashboard() {
     ]).then(([b, l, n]) => { setBookings(b); setListings(l); setNotifications(n) })
       .finally(() => setLoading(false))
   }, [])
+
+  // Realtime: refresh bookings when a new one arrives for this user
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`farmer_bookings_${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `owner_id=eq.${user.id}` },
+        (payload) => setBookings(prev => [payload.new, ...prev])
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `owner_id=eq.${user.id}` },
+        (payload) => setBookings(prev => prev.map(b => b.booking_id === payload.new.booking_id ? payload.new : b))
+      )
+      // Also listen for buyer bookings (farmer books equipment/labor)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `buyer_id=eq.${user.id}` },
+        (payload) => setBookings(prev => prev.map(b => b.booking_id === payload.new.booking_id ? payload.new : b))
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [user])
 
   const myBookings = bookings.filter((b) => b.buyer_id === user?.id)
   const receivedRequests = bookings.filter((b) => b.owner_id === user?.id)
@@ -313,11 +333,32 @@ export function ReceivedRequests({ bookings, setBookings }) {
 }
 
 export function NotificationsList({ notifications, setNotifications }) {
+  const { user } = useAuth()
   const unread = notifications.filter((n) => !n.is_read).length
+
+  // Realtime: append new notifications as they arrive
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`notif_list_${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => setNotifications(prev => [payload.new, ...prev])
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [user])
+
   async function handleMarkAll() {
     await markAllRead()
     setNotifications((ns) => ns.map((n) => ({ ...n, is_read: true })))
   }
+
+  async function handleMarkOne(n) {
+    if (n.is_read) return
+    await markRead(n.id)
+    setNotifications(ns => ns.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+  }
+
   return (
     <div>
       {unread > 0 && (
@@ -333,9 +374,10 @@ export function NotificationsList({ notifications, setNotifications }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {notifications.map((n, i) => (
-            <div key={n.id} className="animate-fade-up" style={{ borderRadius: '14px', padding: '14px 16px', background: n.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(167,116,116,0.04)', border: `1px solid ${n.is_read ? 'rgba(255,255,255,0.06)' : 'rgba(167,116,116,0.15)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', animationDelay: `${i * 0.04}s`, animationFillMode: 'both' }}>
+            <div key={n.id} onClick={() => handleMarkOne(n)} className="animate-fade-up"
+              style={{ borderRadius: '14px', padding: '14px 16px', background: n.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(167,116,116,0.06)', border: `1px solid ${n.is_read ? 'rgba(255,255,255,0.06)' : 'rgba(167,116,116,0.2)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', animationDelay: `${i * 0.04}s`, animationFillMode: 'both', cursor: n.is_read ? 'default' : 'pointer' }}>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                {!n.is_read && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#d4a0a0', flexShrink: 0, marginTop: '5px' }} />}
+                {!n.is_read && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#d4a0a0', flexShrink: 0, marginTop: '5px', boxShadow: '0 0 6px #d4a0a0' }} />}
                 <div>
                   <p style={{ color: '#f1f5f9', fontWeight: 600, fontSize: '13px', marginBottom: '3px' }}>{n.title}</p>
                   <p style={{ color: '#64748b', fontSize: '12px' }}>{n.message}</p>

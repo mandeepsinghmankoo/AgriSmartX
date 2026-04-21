@@ -36,7 +36,7 @@ export function ListingCard({ listing, index = 0 }) {
         <h3 style={{ color: '#f1f5f9', fontWeight: 600, fontSize: '14px', marginBottom: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.title}</h3>
         <p style={{ color: '#475569', fontSize: '12px', marginBottom: '10px' }}>📍 {listing.location}</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: '#d4a0a0', fontWeight: 700, fontSize: '15px' }}>{formatPrice(listing.price)}<span style={{ color: '#475569', fontSize: '11px', fontWeight: 400 }}>/{listing.price_unit}</span></span>
+          <span style={{ color: '#d4a0a0', fontWeight: 700, fontSize: '15px' }}>{formatPrice(listing.price)}{listing.rent_or_sell !== 'sell' && <span style={{ color: '#475569', fontSize: '11px', fontWeight: 400 }}>/{listing.price_unit}</span>}</span>
           {listing.owner_rating && <span style={{ color: '#fbbf24', fontSize: '12px' }}>⭐ {listing.owner_rating}</span>}
         </div>
       </div>

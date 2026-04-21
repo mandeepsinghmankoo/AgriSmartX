@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { getMyListings, deleteListing } from '../../lib/listings'
 import { getMyBookings, updateBookingStatus } from '../../lib/bookings'
 import { getNotifications } from '../../lib/notifications'
+import { supabase } from '../../lib/supabase'
 import { formatPrice, formatDate, timeAgo } from '../../lib/utils'
 import { Loader, DashboardShell, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
 
@@ -35,6 +36,20 @@ export default function AssetOwnerDashboard() {
     ]).then(([l, b, n]) => { setListings(l); setBookings(b); setNotifications(n) })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`asset_bookings_${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `owner_id=eq.${user.id}` },
+        (payload) => setBookings(prev => [payload.new, ...prev])
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `owner_id=eq.${user.id}` },
+        (payload) => setBookings(prev => prev.map(b => b.booking_id === payload.new.booking_id ? payload.new : b))
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [user])
 
   async function handleStatus(bookingId, status) {
     await updateBookingStatus(bookingId, status)

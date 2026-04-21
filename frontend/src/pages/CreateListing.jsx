@@ -209,7 +209,11 @@ export default function CreateListing() {
   }
 
   function setType(value) {
-    setForm((f) => ({ ...f, type: value, price_unit: PRICE_UNITS[value][0] }))
+    setForm((f) => ({ ...f, type: value, price_unit: f.rent_or_sell === 'sell' ? 'fixed' : PRICE_UNITS[value][0] }))
+  }
+
+  function setRentOrSell(value) {
+    setForm((f) => ({ ...f, rent_or_sell: value, price_unit: value === 'sell' ? 'fixed' : PRICE_UNITS[f.type][0] }))
   }
 
   async function handleSubmit(e) {
@@ -273,7 +277,7 @@ export default function CreateListing() {
             ))}
           </div>
           <Grid>
-            <SelectField label="Rent or Sell" value={form.rent_or_sell} onChange={set('rent_or_sell')}>
+            <SelectField label="Rent or Sell" value={form.rent_or_sell} onChange={e => setRentOrSell(e.target.value)}>
               <option value="rent">🔄 Rent / Lease</option>
               <option value="sell">🏷 Sell</option>
             </SelectField>
@@ -304,7 +308,7 @@ export default function CreateListing() {
           <Section title={role === 'dealer' ? 'Product Category' : 'Category'}>
             <Grid>
               {role !== 'dealer' && (
-                <SelectField label="Rent or Sell" value={form.rent_or_sell} onChange={set('rent_or_sell')}>
+                <SelectField label="Rent or Sell" value={form.rent_or_sell} onChange={e => setRentOrSell(e.target.value)}>
                   <option value="rent">🔄 Rent / Lease</option>
                   <option value="sell">🏷 Sell</option>
                 </SelectField>
@@ -345,9 +349,15 @@ export default function CreateListing() {
               <Field label="Price *">
                 <input type="number" value={form.price} onChange={set('price')} min="0" required className="input-dark" />
               </Field>
-              <SelectField label="Price Unit *" value={form.price_unit} onChange={set('price_unit')}>
-                {(PRICE_UNITS[form.type] || ['day']).map((u) => <option key={u} value={u}>{u}</option>)}
-              </SelectField>
+              {form.rent_or_sell === 'sell' ? (
+                <div style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderRadius: '10px', background: 'rgba(134,239,172,0.06)', border: '1px solid rgba(134,239,172,0.15)' }}>
+                  <span style={{ color: '#86efac', fontSize: '12px', fontWeight: 600 }}>🏷 Fixed Sale Price</span>
+                </div>
+              ) : (
+                <SelectField label="Price Unit *" value={form.price_unit} onChange={set('price_unit')}>
+                  {(PRICE_UNITS[form.type] || ['day']).map((u) => <option key={u} value={u}>{u}</option>)}
+                </SelectField>
+              )}
             </Grid>
           )}
         </Section>

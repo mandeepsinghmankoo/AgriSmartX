@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { isAgriRole } from '../../lib/roles'
+import { useUnreadCount } from '../../lib/useUnreadCount'
 
 const ROLE_NAV = {
   farmer: [
@@ -70,6 +71,7 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  const unread = useUnreadCount()
   const navLinks = user
     ? (ROLE_NAV[role] || ROLE_NAV.farmer)
     : [{ to: '/listings', label: 'Explore' }]
@@ -133,6 +135,18 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {user ? (
               <>
+                {/* Notification Bell */}
+                <Link to="/dashboard" style={{ position: 'relative', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', fontSize: '16px', transition: 'all 0.2s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(212,160,160,0.1)'; e.currentTarget.style.color = '#d4a0a0' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#94a3b8' }}
+                  title="Notifications">
+                  🔔
+                  {unread > 0 && (
+                    <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: 'linear-gradient(135deg,#d4a0a0,#a77474)', color: '#0f0a0a', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #0f0a0a' }}>
+                      {unread > 9 ? '9+' : unread}
+                    </span>
+                  )}
+                </Link>
                 <Link
                   to="/profile"
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all"

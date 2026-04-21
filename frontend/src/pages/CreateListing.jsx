@@ -121,12 +121,14 @@ function Grid({ children }) {
 }
 
 // ── Camera Modal ──
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://agrismartx.onrender.com'
+
 function CameraModal({ onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#0f172a', borderRadius: '20px', padding: '16px', width: '100%', maxWidth: '980px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <iframe
-          src="http://127.0.0.1:8000/farm/detect/"
+          src={`${BACKEND_URL}/farm/detect/`}
           title="Live Equipment Detection"
           allow="camera; microphone"
           style={{ width: '100%', height: '80vh', border: 'none', borderRadius: '12px', background: '#000' }}

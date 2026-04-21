@@ -1,22 +1,38 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt  # Use cautiously; consider proper CSRF handling for production
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.core.files.base import ContentFile
 from django.conf import settings
-import cv2
 import numpy as np
-import tensorflow as tf
 from pathlib import Path
 from uuid import uuid4
 from .models import DetectionHistory
 import os
 
-# Load the trained model once, but don't crash app startup if missing
+# Try importing cv2 and tensorflow — optional on free tier
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+
+try:
+    import tensorflow as tf
+    TF_AVAILABLE = True
+except ImportError:
+    TF_AVAILABLE = False
+
+# Load model only if tensorflow is available
 MODEL_PATH = Path(
     os.getenv("MODEL_PATH", str(Path(settings.BASE_DIR).parent / "farm_equipment_model.h5"))
 )
-model = tf.keras.models.load_model(str(MODEL_PATH)) if MODEL_PATH.exists() else None
+model = None
+if TF_AVAILABLE and MODEL_PATH.exists():
+    try:
+        model = tf.keras.models.load_model(str(MODEL_PATH))
+    except Exception:
+        model = None
 # Class names (must match your dataset)
 classes = [
     "combine_harvester",
@@ -27,14 +43,15 @@ classes = [
     "tractor"
 ]
 
-@csrf_exempt  # Remove in production; handle CSRF properly
+@csrf_exempt
 @xframe_options_exempt
 def detect_equipment(request):
+    if not TF_AVAILABLE:
+        return JsonResponse({"error": "TensorFlow not installed on this server. ML detection unavailable."}, status=503)
+    if not CV2_AVAILABLE:
+        return JsonResponse({"error": "OpenCV not installed on this server."}, status=503)
     if model is None:
-        return JsonResponse(
-            {"error": f"Model file not found at: {MODEL_PATH}"},
-            status=500,
-        )
+        return JsonResponse({"error": f"Model file not found at: {MODEL_PATH}"}, status=500)
 
     if request.method == 'POST' and request.FILES.get('image'):
         # Get the uploaded image
@@ -45,7 +62,7 @@ def detect_equipment(request):
 
             # Decode uploaded image bytes directly (faster for live detection).
             file_bytes = np.frombuffer(image_bytes, np.uint8)
-            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR) if CV2_AVAILABLE else None
             if img is None:
                 return JsonResponse({'error': 'Invalid image file'}, status=400)
             

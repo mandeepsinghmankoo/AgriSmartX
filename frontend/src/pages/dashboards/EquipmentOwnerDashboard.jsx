@@ -6,7 +6,8 @@ import { getMyListings, deleteListing } from '../../lib/listings'
 import { getMyBookings, updateBookingStatus } from '../../lib/bookings'
 import { getNotifications } from '../../lib/notifications'
 import { formatPrice, formatDate, timeAgo } from '../../lib/utils'
-import { Loader, DashboardShell, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import { Loader, DashboardShell, DashboardLoadError, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import ChatPanel from '../../components/common/ChatPanel'
 
 const SS = {
   pending:   { bg: 'rgba(245,158,11,0.1)',  color: '#fbbf24', border: 'rgba(245,158,11,0.2)' },
@@ -26,22 +27,25 @@ export default function EquipmentOwnerDashboard() {
   const [tab, setTab] = useState('overview')
   const [listingFilter, setListingFilter] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [chatBooking, setChatBooking] = useState(null)
 
   useEffect(() => {
     Promise.all([
-      getMyListings().catch(() => []),
-      getMyBookings().catch(() => []),
-      getNotifications().catch(() => []),
+      getMyListings(),
+      getMyBookings(),
+      getNotifications(),
     ]).then(([l, b, n]) => { setListings(l); setBookings(b); setNotifications(n) })
+      .catch((error) => setLoadError(error.message || 'Please retry in a moment.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [user?.id])
 
   const myEquipment  = listings.filter((l) => l.type === 'equipment')
   const myLivestock  = listings.filter((l) => l.type === 'livestock')
   const allListings  = listings.filter((l) => ['equipment', 'livestock'].includes(l.type))
   const requests     = bookings.filter((b) => b.owner_id === user?.id)
   const pending      = requests.filter((b) => b.status === 'pending')
-  const totalEarnings = requests.filter(b => b.status === 'completed').reduce((s, b) => s + (b.grand_total || 0), 0)
+  const totalEarnings = requests.filter(b => b.status === 'completed').reduce((s, b) => s + (b.grand_total || b.total_amount || 0), 0)
   const unread       = notifications.filter((n) => !n.is_read).length
 
   const filteredListings = listingFilter === 'all' ? allListings
@@ -51,6 +55,8 @@ export default function EquipmentOwnerDashboard() {
     await updateBookingStatus(bookingId, status)
     setBookings((bs) => bs.map((b) => b.booking_id === bookingId ? { ...b, status } : b))
   }
+
+  function openChat(b) { setChatBooking(b) }
 
   const TABS = [
     { id: 'overview',      label: 'Overview',    icon: '📊' },
@@ -69,6 +75,7 @@ export default function EquipmentOwnerDashboard() {
       action={<Link to="/create-listing" className="btn-primary" style={{ textDecoration: 'none', padding: '10px 20px', fontSize: '13px' }}>+ Add Listing</Link>}
       tabs={TABS} tab={tab} setTab={setTab}
     >
+      <DashboardLoadError error={loadError} />
       {/* ── OVERVIEW ── */}
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -93,9 +100,12 @@ export default function EquipmentOwnerDashboard() {
                     </div>
                     <span style={{ color: '#d4a0a0', fontWeight: 700, fontSize: '16px' }}>{formatPrice(b.grand_total || b.total_amount)}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
-                    <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button onClick={() => openChat(b)} style={{ width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>💬 Chat with Buyer</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
+                      <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -187,17 +197,18 @@ export default function EquipmentOwnerDashboard() {
                   </div>
                   <span style={{ color: '#d4a0a0', fontWeight: 700, fontSize: '16px' }}>{formatPrice(b.grand_total || b.total_amount)}</span>
                 </div>
-                {b.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
-                    <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
-                  </div>
-                )}
-                {b.status === 'approved' && (
-                  <button onClick={() => handleStatus(b.booking_id, 'completed')} style={{ width: '100%', padding: '8px', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-                    ✔ Mark Completed
-                  </button>
-                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                  <button onClick={() => openChat(b)} style={{ width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>💬 Chat with Buyer</button>
+                  {b.status === 'pending' && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleStatus(b.booking_id, 'approved')} className="btn-primary" style={{ flex: 1, padding: '8px' }}>✅ Approve</button>
+                      <button onClick={() => handleStatus(b.booking_id, 'rejected')} className="btn-danger" style={{ flex: 1, padding: '8px', borderRadius: '10px' }}>❌ Reject</button>
+                    </div>
+                  )}
+                  {b.status === 'approved' && (
+                    <button onClick={() => handleStatus(b.booking_id, 'completed')} style={{ width: '100%', padding: '8px', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>✔ Mark Completed</button>
+                  )}
+                </div>
               </div>
             )
           })}
@@ -230,6 +241,7 @@ export default function EquipmentOwnerDashboard() {
       )}
 
       {tab === 'notifications' && <NotificationsList notifications={notifications} setNotifications={setNotifications} />}
+      {chatBooking && <ChatPanel booking={chatBooking} onClose={() => setChatBooking(null)} />}
     </DashboardShell>
   )
 }

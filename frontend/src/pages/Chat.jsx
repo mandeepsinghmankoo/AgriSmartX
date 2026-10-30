@@ -2,18 +2,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { getMessages, sendMessage, markMessagesRead } from '../lib/chat'
+import { getMessages, openBookingChat, sendMessage, markMessagesRead } from '../lib/chat'
 import { timeAgo } from '../lib/utils'
 
 export default function Chat() {
   const [params] = useSearchParams()
-  const chatId     = params.get('listing_id')   // uuid used directly as chat room
+  const bookingId  = params.get('booking_id')
+  const listingId  = params.get('listing_id')
+  const requestedChatId = params.get('chat_id')
   const ownerId    = params.get('owner_id')
   const ownerName  = params.get('owner_name')  || 'Owner'
   const buyerName  = params.get('buyer_name')  || 'Buyer'
   const title      = params.get('title')        || 'Listing'
 
   const [user, setUser]         = useState(null)
+  const [chatId, setChatId]     = useState(null)
   const [messages, setMessages] = useState([])
   const [text, setText]         = useState('')
   const [loading, setLoading]   = useState(true)
@@ -22,17 +25,56 @@ export default function Chat() {
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
+    let active = true
+    supabase.auth.getUser()
+      .then(({ data: { user }, error: authError }) => {
+        if (authError) throw authError
+        if (active) setUser(user)
+      })
+      .catch(e => { if (active) setError(e.message) })
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
-    if (!user || !chatId) return
+    if (!user) return
+    let active = true
     setLoading(true)
-    getMessages(chatId)
-      .then(msgs => { setMessages(msgs); markMessagesRead(chatId) })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [user, chatId])
+
+    async function loadChat() {
+      let roomId = requestedChatId
+      let resolvedBookingId = bookingId
+      if (!roomId && !resolvedBookingId && listingId) {
+        let query = supabase
+          .from('bookings')
+          .select('id')
+          .eq('listing_id', listingId)
+          .or(`buyer_id.eq.${user.id},owner_id.eq.${user.id}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (ownerId) query = query.eq('owner_id', ownerId)
+
+        const { data, error: bookingError } = await query.maybeSingle()
+        if (bookingError) throw bookingError
+        if (!data) throw new Error('No booking was found for this listing and account.')
+        resolvedBookingId = data.id
+      }
+
+      if (!roomId && !resolvedBookingId) throw new Error('A booking ID is required to open this chat.')
+      if (!roomId) roomId = await openBookingChat(resolvedBookingId)
+      const msgs = await getMessages(roomId)
+      if (!active) return
+      setChatId(roomId)
+      setMessages(msgs)
+      markMessagesRead(roomId)
+    }
+
+    loadChat()
+      .catch(e => { if (active) setError(e.message) })
+      .finally(() => { if (active) setLoading(false) })
+
+    return () => { active = false }
+  }, [user, bookingId, listingId, ownerId, requestedChatId])
 
   useEffect(() => {
     if (!chatId) return
@@ -57,6 +99,7 @@ export default function Chat() {
     e.preventDefault()
     if (!text.trim() || !chatId) return
     setSending(true)
+    setError('')
     try {
       await sendMessage(chatId, text.trim())
       setText('')

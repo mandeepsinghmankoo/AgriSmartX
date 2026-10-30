@@ -19,6 +19,7 @@ export default function ListingDetail() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [listing, setListing] = useState(null)
+  const [listingError, setListingError] = useState('')
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [imgIdx, setImgIdx] = useState(0)
@@ -28,8 +29,33 @@ export default function ListingDetail() {
   const [bookingSuccess, setBookingSuccess] = useState(false)
 
   useEffect(() => {
-    getListing(id).then((d) => { setListing(d); setLoading(false) }).catch(() => setLoading(false))
-    getListingReviews(id).then(setReviews).catch(() => setReviews([]))
+    let cancelled = false
+    setLoading(true)
+    setListing(null)
+    setListingError('')
+    setReviews([])
+    setImgIdx(0)
+    setBookingSuccess(false)
+    setBookingError('')
+    setBooking({ start_date: '', end_date: '', quantity: 1, special_instructions: '' })
+    getListing(id)
+      .then((data) => {
+        if (!cancelled) setListing(data)
+      })
+      .catch((error) => {
+        if (!cancelled) setListingError(error.message || 'Could not load this listing.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    getListingReviews(id)
+      .then((data) => {
+        if (!cancelled) setReviews(data)
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('Failed to load listing reviews:', error)
+      })
+    return () => { cancelled = true }
   }, [id])
 
   async function handleBook(e) {
@@ -72,13 +98,15 @@ export default function ListingDetail() {
   if (!listing) return (
     <div style={{ textAlign: 'center', padding: '80px 20px' }}>
       <div style={{ fontSize: '56px', marginBottom: '16px' }}>😕</div>
-      <h3 style={{ color: '#f1f5f9', fontSize: '18px', fontWeight: 600 }}>Listing not found</h3>
+      <h3 style={{ color: '#f1f5f9', fontSize: '18px', fontWeight: 600 }}>{listingError ? 'Could not load listing' : 'Listing not found'}</h3>
+      {listingError && <p role="alert" style={{ color: '#f87171', fontSize: '13px', marginTop: '8px' }}>{listingError}</p>}
     </div>
   )
 
   const images = listing.images?.length ? listing.images : []
   const tc = TYPE_COLORS[listing.type] || TYPE_COLORS.land
   const icons = { equipment: '🚜', land: '🌾', livestock: '🐄', labor: '👨🌾' }
+  const isOwner = user?.id === listing.owner_id
 
   const days = booking.start_date && booking.end_date
     ? Math.max(1, Math.ceil((new Date(booking.end_date) - new Date(booking.start_date)) / 86400000))
@@ -87,7 +115,7 @@ export default function ListingDetail() {
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '28px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isOwner ? '1fr' : '1fr 340px', gap: '28px', alignItems: 'start' }}>
 
         {/* ── LEFT ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -183,8 +211,8 @@ export default function ListingDetail() {
           )}
         </div>
 
-        {/* ── RIGHT: Booking Card ── */}
-        <div style={{ position: 'sticky', top: '80px' }}>
+        {/* Owners should not be able to book their own listings. */}
+        {!isOwner && <div style={{ position: 'sticky', top: '80px' }}>
           <div className="glass-strong" style={{ borderRadius: '24px', padding: '24px' }}>
             <h2 style={{ color: '#f1f5f9', fontSize: '17px', fontWeight: 700, marginBottom: '20px' }}>
               {listing.rent_or_sell === 'sell' ? '🏷 Buy Now' : '📅 Book Now'}
@@ -271,7 +299,7 @@ export default function ListingDetail() {
               </form>
             )}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   )
@@ -330,5 +358,3 @@ function SpecificDetails({ listing }) {
     </div>
   )
 }
-
-

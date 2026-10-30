@@ -32,15 +32,17 @@ export default function FarmerDashboard() {
   const [notifications, setNotifications] = useState([])
   const [tab, setTab] = useState('overview')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     Promise.all([
-      getMyBookings().catch(() => []),
-      getMyListings().catch(() => []),
-      getNotifications().catch(() => []),
+      getMyBookings(),
+      getMyListings(),
+      getNotifications(),
     ]).then(([b, l, n]) => { setBookings(b); setListings(l); setNotifications(n) })
+      .catch((error) => setLoadError(error.message || 'Please retry in a moment.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [user?.id])
 
   // Realtime: refresh bookings when a new one arrives for this user
   useEffect(() => {
@@ -85,6 +87,7 @@ export default function FarmerDashboard() {
       tab={tab}
       setTab={setTab}
     >
+      <DashboardLoadError error={loadError} />
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Stats */}
@@ -177,6 +180,15 @@ export function Loader() {
         <p style={{ color: '#475569', fontSize: '14px' }}>Loading...</p>
       </div>
     </div>
+  )
+}
+
+export function DashboardLoadError({ error }) {
+  if (!error) return null
+  return (
+    <p role="alert" style={{ color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
+      Dashboard data could not be loaded: {error}
+    </p>
   )
 }
 

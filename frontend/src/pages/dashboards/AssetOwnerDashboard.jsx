@@ -7,7 +7,7 @@ import { getMyBookings, updateBookingStatus } from '../../lib/bookings'
 import { getNotifications } from '../../lib/notifications'
 import { supabase } from '../../lib/supabase'
 import { formatPrice, formatDate, timeAgo } from '../../lib/utils'
-import { Loader, DashboardShell, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import { Loader, DashboardShell, DashboardLoadError, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
 import ChatPanel from '../../components/common/ChatPanel'
 
 const SS = {
@@ -27,17 +27,19 @@ export default function AssetOwnerDashboard() {
   const [notifications, setNotifications] = useState([])
   const [tab, setTab]                 = useState('overview')
   const [loading, setLoading]         = useState(true)
+  const [loadError, setLoadError]     = useState('')
   const [assetFilter, setAssetFilter] = useState('all')
   const [chatBooking, setChatBooking] = useState(null)
 
   useEffect(() => {
     Promise.all([
-      getMyListings().catch(() => []),
-      getMyBookings().catch(() => []),
-      getNotifications().catch(() => []),
+      getMyListings(),
+      getMyBookings(),
+      getNotifications(),
     ]).then(([l, b, n]) => { setListings(l); setBookings(b); setNotifications(n) })
+      .catch((error) => setLoadError(error.message || 'Please retry in a moment.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (!user) return
@@ -64,7 +66,7 @@ export default function AssetOwnerDashboard() {
   const filtered    = assetFilter === 'all' ? myAssets : myAssets.filter(l => l.type === assetFilter)
   const requests    = bookings.filter(b => b.owner_id === user?.id)
   const pending     = requests.filter(b => b.status === 'pending')
-  const totalEarned = requests.filter(b => b.status === 'completed').reduce((s, b) => s + (b.grand_total || 0), 0)
+  const totalEarned = requests.filter(b => b.status === 'completed').reduce((s, b) => s + (b.grand_total || b.total_amount || 0), 0)
   const unread      = notifications.filter(n => !n.is_read).length
 
   const TABS = [
@@ -88,6 +90,7 @@ export default function AssetOwnerDashboard() {
       }
       tabs={TABS} tab={tab} setTab={setTab}
     >
+      <DashboardLoadError error={loadError} />
       {/* ── OVERVIEW ── */}
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

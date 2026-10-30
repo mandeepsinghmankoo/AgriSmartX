@@ -7,7 +7,7 @@ import { getMyBookings, updateBookingStatus } from '../../lib/bookings'
 import { getNotifications } from '../../lib/notifications'
 import { supabase } from '../../lib/supabase'
 import { formatPrice, formatDate, timeAgo } from '../../lib/utils'
-import { Loader, DashboardShell, StatCard, SectionTitle, BookingsList, NotificationsList } from './FarmerDashboard'
+import { Loader, DashboardShell, DashboardLoadError, StatCard, SectionTitle, BookingsList, NotificationsList } from './FarmerDashboard'
 import ChatPanel from '../../components/common/ChatPanel'
 
 const LABEL = { color: '#64748b', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }
@@ -19,6 +19,7 @@ export default function LaborDashboard() {
   const [notifications, setNotifications] = useState([])
   const [tab, setTab] = useState('overview')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [profileForm, setProfileForm] = useState({
     bio: profile?.bio || '',
     skills: profile?.skills?.join(', ') || '',
@@ -33,12 +34,13 @@ export default function LaborDashboard() {
 
   useEffect(() => {
     Promise.all([
-      getMyListings().catch(() => []),
-      getMyBookings().catch(() => []),
-      getNotifications().catch(() => []),
+      getMyListings(),
+      getMyBookings(),
+      getNotifications(),
     ]).then(([l, b, n]) => { setListings(l); setBookings(b); setNotifications(n) })
+      .catch((error) => setLoadError(error.message || 'Please retry in a moment.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (!user) return
@@ -105,6 +107,7 @@ export default function LaborDashboard() {
       }
       tabs={TABS} tab={tab} setTab={setTab}
     >
+      <DashboardLoadError error={loadError} />
       {/* ── OVERVIEW ── */}
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

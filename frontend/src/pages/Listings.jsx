@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getListings } from '../lib/listings'
-import { ListingCard } from './Home'
+import { getMarketplaceProducts } from '../lib/marketplace'
+import { ListingCard, ProductCard } from './Home'
 
 const TYPES = [
   { value: '', label: 'All', icon: '🔍' },
@@ -10,6 +11,7 @@ const TYPES = [
   { value: 'land', label: 'Land', icon: '🌾' },
   { value: 'labor', label: 'Labor', icon: '👨🌾' },
   { value: 'livestock', label: 'Livestock', icon: '🐄' },
+  { value: 'products', label: 'Products', icon: '📦' },
 ]
 
 function SkeletonCard() {
@@ -39,7 +41,10 @@ export default function Listings() {
 
   useEffect(() => {
     setLoading(true)
-    getListings({ ...filters })
+    const request = filters.type === 'products'
+      ? getMarketplaceProducts({ minPrice: filters.minPrice, maxPrice: filters.maxPrice })
+      : getListings({ ...filters })
+    request
       .then(setListings)
       .catch(() => setListings([]))
       .finally(() => setLoading(false))
@@ -50,7 +55,7 @@ export default function Listings() {
     if (k === 'type') setSearchParams(val ? { type: val } : {})
   }
 
-  const activeCount = [filters.location, filters.minPrice, filters.maxPrice].filter(Boolean).length
+  const activeCount = [filters.type !== 'products' && filters.location, filters.minPrice, filters.maxPrice].filter(Boolean).length
 
   return (
     <div>
@@ -111,11 +116,13 @@ export default function Listings() {
       {/* Advanced filters */}
       {showFilters && (
         <div className="glass animate-fade-down" style={{ borderRadius: '16px', padding: '20px', marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: '1', minWidth: '160px' }}>
-            <label style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Location</label>
-            <input type="text" placeholder="e.g. Nashik, Pune..." value={filters.location}
-              onChange={(e) => set('location')(e.target.value)} className="input-dark" />
-          </div>
+          {filters.type !== 'products' && (
+            <div style={{ flex: '1', minWidth: '160px' }}>
+              <label style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Location</label>
+              <input type="text" placeholder="e.g. Nashik, Pune..." value={filters.location}
+                onChange={(e) => set('location')(e.target.value)} className="input-dark" />
+            </div>
+          )}
           <div style={{ flex: '1', minWidth: '120px' }}>
             <label style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Min Price ₹</label>
             <input type="number" placeholder="0" value={filters.minPrice}
@@ -139,7 +146,9 @@ export default function Listings() {
       {/* Results count */}
       {!loading && (
         <p style={{ color: '#334155', fontSize: '13px', marginBottom: '20px' }}>
-          {listings.length === 0 ? 'No listings found' : `${listings.length} listing${listings.length !== 1 ? 's' : ''} found`}
+          {listings.length === 0
+            ? `No ${filters.type === 'products' ? 'products' : 'listings'} found`
+            : `${listings.length} ${filters.type === 'products' ? `product${listings.length !== 1 ? 's' : ''}` : `listing${listings.length !== 1 ? 's' : ''}`} found`}
         </p>
       )}
 
@@ -150,17 +159,19 @@ export default function Listings() {
         </div>
       ) : listings.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-          <div style={{ fontSize: '56px', marginBottom: '16px' }}>🔍</div>
-          <h3 style={{ color: '#f1f5f9', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>No listings found</h3>
+          <div style={{ fontSize: '56px', marginBottom: '16px' }}>{filters.type === 'products' ? '📦' : '🔍'}</div>
+          <h3 style={{ color: '#f1f5f9', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>
+            No {filters.type === 'products' ? 'products' : 'listings'} found
+          </h3>
           <p style={{ color: '#475569', fontSize: '14px' }}>Try adjusting your filters or search in a different location.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-          {listings.map((l, i) => <ListingCard key={l.id} listing={l} index={i} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${filters.type === 'products' ? '220px' : '280px'}, 1fr))`, gap: '16px' }}>
+          {filters.type === 'products'
+            ? listings.map((product, i) => <ProductCard key={product.id} product={product} index={i} />)
+            : listings.map((listing, i) => <ListingCard key={listing.id} listing={listing} index={i} />)}
         </div>
       )}
     </div>
   )
 }
-
-

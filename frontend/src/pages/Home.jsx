@@ -55,7 +55,7 @@ const CAT_META = {
   other:        { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', icon: '📦' },
 }
 
-function ProductCard({ product, index = 0 }) {
+export function ProductCard({ product, index = 0 }) {
   const cat = CAT_META[product.category] || CAT_META.other
   const discount = product.original_price && product.original_price > product.price
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : null

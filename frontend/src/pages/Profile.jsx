@@ -1,9 +1,12 @@
 // src/pages/Profile.jsx
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { uploadImage } from '../lib/storage'
+import { getMyListings } from '../lib/listings'
+import { getMyMarketplaceProducts } from '../lib/marketplace'
 import { formatDate } from '../lib/utils'
+import { ListingCard, ProductCard } from './Home'
 
 const LABEL = { color: '#64748b', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }
 
@@ -31,6 +34,45 @@ export default function Profile() {
   const [error, setError] = useState('')
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(profile?.profile_image || null)
+  const [myListings, setMyListings] = useState([])
+  const [myProducts, setMyProducts] = useState([])
+  const [listingsLoading, setListingsLoading] = useState(true)
+  const [listingsError, setListingsError] = useState('')
+  const [activeListingType, setActiveListingType] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setListingsLoading(true)
+    setListingsError('')
+    Promise.all([getMyListings(), getMyMarketplaceProducts()])
+      .then(([listings, products]) => {
+        if (cancelled) return
+        setMyListings(listings)
+        setMyProducts(products)
+      })
+      .catch((err) => {
+        if (!cancelled) setListingsError(err.message || 'Could not load your listings.')
+      })
+      .finally(() => {
+        if (!cancelled) setListingsLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [user?.id])
+
+  const listingTypes = useMemo(() => [
+    { value: '', label: 'All', icon: '🔍' },
+    { value: 'equipment', label: 'Equipment', icon: '🚜' },
+    { value: 'land', label: 'Land', icon: '🌾' },
+    { value: 'labor', label: 'Labor', icon: '👨🌾' },
+    { value: 'livestock', label: 'Livestock', icon: '🐄' },
+    { value: 'products', label: 'Products', icon: '📦' },
+  ], [])
+  const filteredListings = activeListingType === 'products'
+    ? []
+    : myListings.filter((listing) => !activeListingType || listing.type === activeListingType)
+  const filteredProducts = activeListingType === 'products' || !activeListingType ? myProducts : []
+  const visibleListingsCount = filteredListings.length + filteredProducts.length
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -107,6 +149,56 @@ export default function Profile() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* My Listings */}
+      <div className="glass" style={{ borderRadius: '24px', padding: '24px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ color: '#f1f5f9', fontSize: '18px', fontWeight: 700 }}>My Listings</h2>
+            <p style={{ color: '#64748b', fontSize: '12px', marginTop: '4px' }}>Manage and view items you have posted.</p>
+          </div>
+          <span style={{ color: '#d4a0a0', fontSize: '13px', fontWeight: 600 }}>{myListings.length + myProducts.length} posted</span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
+          {listingTypes.map((type) => {
+            const count = type.value === 'products'
+              ? myProducts.length
+              : myListings.filter((listing) => !type.value || listing.type === type.value).length
+            return (
+              <button key={type.value} type="button" onClick={() => setActiveListingType(type.value)}
+                style={{
+                  padding: '7px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                  border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
+                  borderColor: activeListingType === type.value ? 'rgba(212,160,160,0.45)' : 'rgba(255,255,255,0.08)',
+                  background: activeListingType === type.value ? 'rgba(167,116,116,0.14)' : 'rgba(255,255,255,0.04)',
+                  color: activeListingType === type.value ? '#d4a0a0' : '#64748b',
+                }}>
+                {type.icon} {type.label} ({count})
+              </button>
+            )
+          })}
+        </div>
+
+        {listingsError && (
+          <p role="alert" style={{ color: '#f87171', fontSize: '13px', marginBottom: '16px' }}>Could not load your listings: {listingsError}</p>
+        )}
+        {listingsLoading ? (
+          <p style={{ color: '#64748b', fontSize: '13px' }}>Loading your listings...</p>
+        ) : visibleListingsCount === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 12px' }}>
+            <div style={{ fontSize: '36px', marginBottom: '8px' }}>📦</div>
+            <p style={{ color: '#94a3b8', fontSize: '14px' }}>
+              {activeListingType ? `You have no ${activeListingType === 'products' ? 'products' : activeListingType} listings yet.` : 'You have not posted any listings yet.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' }}>
+            {filteredListings.map((listing, index) => <ListingCard key={listing.id} listing={listing} index={index} />)}
+            {filteredProducts.map((product, index) => <ProductCard key={product.id} product={product} index={index} />)}
+          </div>
+        )}
       </div>
 
       {/* Edit Form */}

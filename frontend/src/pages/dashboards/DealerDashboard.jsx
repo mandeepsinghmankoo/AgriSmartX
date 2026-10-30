@@ -7,7 +7,7 @@ import { getMyBookings, updateBookingStatus } from '../../lib/bookings'
 import { getNotifications } from '../../lib/notifications'
 import { supabase } from '../../lib/supabase'
 import { formatPrice, timeAgo } from '../../lib/utils'
-import { Loader, DashboardShell, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import { Loader, DashboardShell, DashboardLoadError, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
 import ChatPanel from '../../components/common/ChatPanel'
 
 export default function DealerDashboard() {
@@ -17,16 +17,18 @@ export default function DealerDashboard() {
   const [notifications, setNotifications] = useState([])
   const [tab, setTab] = useState('overview')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [chatBooking, setChatBooking] = useState(null)
 
   useEffect(() => {
     Promise.all([
-      getMyListings().catch(() => []),
-      getMyBookings().catch(() => []),
-      getNotifications().catch(() => []),
+      getMyListings(),
+      getMyBookings(),
+      getNotifications(),
     ]).then(([l, b, n]) => { setListings(l); setBookings(b); setNotifications(n) })
+      .catch((error) => setLoadError(error.message || 'Please retry in a moment.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (!user) return
@@ -46,7 +48,7 @@ export default function DealerDashboard() {
   const salesRequests = bookings.filter((b) => b.owner_id === user?.id)
   const myPurchases = bookings.filter((b) => b.buyer_id === user?.id)
   const pending = salesRequests.filter((b) => b.status === 'pending')
-  const totalRevenue = salesRequests.filter(b => b.status === 'completed').reduce((s, b) => s + (b.grand_total || 0), 0)
+  const totalRevenue = salesRequests.filter(b => b.status === 'completed').reduce((s, b) => s + (b.grand_total || b.total_amount || 0), 0)
   const unread = notifications.filter((n) => !n.is_read).length
 
   async function handleStatus(bookingId, status) {
@@ -73,6 +75,7 @@ export default function DealerDashboard() {
       action={<Link to="/create-listing" className="btn-primary" style={{ textDecoration: 'none', padding: '10px 20px', fontSize: '13px' }}>+ Add Listing</Link>}
       tabs={TABS} tab={tab} setTab={setTab}
     >
+      <DashboardLoadError error={loadError} />
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px' }}>

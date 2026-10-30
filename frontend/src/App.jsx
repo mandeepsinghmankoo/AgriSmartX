@@ -14,6 +14,7 @@ import MyBookings from './pages/MyBookings'
 import Profile from './pages/Profile'
 import Dashboard from './pages/Dashboard'
 import Marketplace from './pages/Marketplace'
+import MarketplaceOrders from './pages/MarketplaceOrders'
 import CropSales from './pages/CropSales'
 import PostCrop from './pages/PostCrop'
 import Chat from './pages/Chat'
@@ -54,7 +55,8 @@ function GlobalBackground() {
 }
 
 function PrivateRoute({ children }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  if (loading) return <div role="status" style={{ color: '#94a3b8', textAlign: 'center', padding: '48px' }}>Restoring your session...</div>
   return user ? children : <Navigate to="/login" replace />
 }
 
@@ -66,7 +68,8 @@ const ROLE_ACCESS = {
 }
 
 function RoleRoute({ path, children }) {
-  const { user, role } = useAuth()
+  const { user, role, loading } = useAuth()
+  if (loading) return <div role="status" style={{ color: '#94a3b8', textAlign: 'center', padding: '48px' }}>Restoring your session...</div>
   if (!user) return <Navigate to="/login" replace />
   const allowed = ROLE_ACCESS[path]
   if (allowed && !allowed.includes(role)) return <Navigate to="/dashboard" replace />
@@ -89,6 +92,7 @@ function App() {
             <Route path="/listings/:id" element={<PrivateRoute><ListingDetail /></PrivateRoute>} />
             <Route path="/marketplace" element={<PrivateRoute><Marketplace /></PrivateRoute>} />
             <Route path="/marketplace/:id" element={<PrivateRoute><Marketplace /></PrivateRoute>} />
+            <Route path="/orders" element={<PrivateRoute><MarketplaceOrders /></PrivateRoute>} />
             <Route path="/create-listing" element={<RoleRoute path="/create-listing"><CreateListing /></RoleRoute>} />
             <Route path="/my-bookings" element={<RoleRoute path="/my-bookings"><MyBookings /></RoleRoute>} />
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />

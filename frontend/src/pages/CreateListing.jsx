@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createListing } from '../lib/listings'
+import { createProduct } from '../lib/marketplace'
 import { uploadMultiple } from '../lib/storage'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -17,20 +18,28 @@ const PRICE_UNITS = {
 const ROLE_TYPES = {
   farmer:         ['equipment', 'land'],
   labor:          ['labor'],
+  asset_owner:    ['equipment', 'livestock'],
   equipment_owner:['equipment', 'livestock'],
   dealer:         ['product'],
 }
 
+const EQUIPMENT_CATEGORIES = [
+  { value: 'tractor', label: 'Tractor' },
+  { value: 'harvester', label: 'Harvester' },
+  { value: 'pump', label: 'Water Pump' },
+  { value: 'sprayer', label: 'Sprayer' },
+]
+
 const PRODUCT_CATEGORIES = [
-  { value: 'pesticide',   label: '🧪 Pesticides & Insecticides' },
-  { value: 'fertilizer',  label: '🧴 Fertilizers & Manure' },
-  { value: 'seed',        label: '🌱 Seeds & Saplings' },
-  { value: 'animal_feed', label: '🌾 Animal Feed & Fodder' },
-  { value: 'tool',        label: '🔧 Hand Tools & Equipment' },
-  { value: 'irrigation',  label: '💧 Irrigation Supplies' },
-  { value: 'organic',     label: '🌿 Organic Products' },
-  { value: 'medicine',    label: '💊 Veterinary Medicine' },
-  { value: 'other',       label: '📦 Other Agri Products' },
+  { value: 'pesticide', label: '🧪 Pesticides & Insecticides', expiry: true },
+  { value: 'fertilizer', label: '🧴 Fertilizers & Manure', expiry: true },
+  { value: 'seed', label: '🌱 Seeds & Saplings', expiry: true },
+  { value: 'animal_feed', label: '🌾 Animal Feed & Fodder', expiry: true, location: 'optional' },
+  { value: 'tool', label: '🔧 Hand Tools & Equipment', location: 'optional' },
+  { value: 'irrigation', label: '💧 Irrigation Supplies', location: 'optional' },
+  { value: 'organic', label: '🌿 Organic Products', expiry: true },
+  { value: 'medicine', label: '💊 Veterinary Medicine', expiry: true },
+  { value: 'other', label: '📦 Other Agri Products', location: 'optional' },
 ]
 
 const TYPE_OPTIONS = [
@@ -170,6 +179,14 @@ export default function CreateListing() {
     own_transport: false, distance_will_travel: '',
     brand: '', quantity: '', quantity_unit: '', expiry_date: '', stock_available: '',
   })
+  const isEquipment = form.type === 'equipment'
+  const isTractor = isEquipment && form.category === 'tractor'
+  const isHarvester = isEquipment && form.category === 'harvester'
+  const isPump = isEquipment && form.category === 'pump'
+  const isSprayer = isEquipment && form.category === 'sprayer'
+  const productCategory = PRODUCT_CATEGORIES.find(category => category.value === form.category)
+  const showProductLocation = form.type === 'product' && productCategory?.location
+  const locationRequired = !isLabor && form.type !== 'product'
   const [images, setImages] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -181,11 +198,21 @@ export default function CreateListing() {
   }
 
   function setType(value) {
-    setForm((f) => ({ ...f, type: value, price_unit: f.rent_or_sell === 'sell' ? 'fixed' : PRICE_UNITS[value][0] }))
+    setForm((f) => ({ ...f, type: value, category: '', price_unit: f.rent_or_sell === 'sell' ? 'fixed' : PRICE_UNITS[value][0] }))
   }
 
   function setRentOrSell(value) {
     setForm((f) => ({ ...f, rent_or_sell: value, price_unit: value === 'sell' ? 'fixed' : PRICE_UNITS[f.type][0] }))
+  }
+
+  function setCategory(value) {
+    const selectedCategory = PRODUCT_CATEGORIES.find(category => category.value === value)
+    setForm((f) => ({
+      ...f,
+      category: value,
+      ...(form.type === 'product' && !selectedCategory?.expiry ? { expiry_date: '' } : {}),
+      ...(form.type === 'product' && !selectedCategory?.location ? { location: '', state: '', pincode: '' } : {}),
+    }))
   }
 
   async function handleSubmit(e) {
@@ -193,13 +220,26 @@ export default function CreateListing() {
     if (isLabor) {
       if (!form.title || !form.daily_rate) return setError('Title and Daily Rate are required')
     } else {
-      if (!form.title || !form.price || !form.location) return setError('Title, price and location are required')
+      if (!form.title || !form.price || (locationRequired && !form.location))
+        return setError(locationRequired ? 'Title, price and location are required' : 'Title and price are required')
+      if (form.type === 'product' && !productCategory) return setError('Select a product category')
     }
     setLoading(true); setError('')
     try {
       let imageUrls = []
       if (images.length) imageUrls = await uploadMultiple(images)
       const payload = { ...form, images: imageUrls, price: parseFloat(isLabor ? form.daily_rate : form.price) }
+      const equipmentFields = ['manufacturer', 'equipment_model', 'year', 'horsepower', 'fuel_type', 'equipment_condition', 'hours_used', 'operator_included', 'delivery_available']
+      if (form.type !== 'equipment') {
+        equipmentFields.forEach((field) => delete payload[field])
+      } else {
+        if (!isTractor) delete payload.horsepower
+        if (!isTractor && !isHarvester) delete payload.year
+        if (!isTractor && !isHarvester && !isPump) {
+          delete payload.fuel_type
+          delete payload.hours_used
+        }
+      }
       ;['year', 'horsepower', 'hours_used', 'area', 'age', 'weight', 'milk_yield',
         'experience', 'daily_rate', 'hourly_rate', 'distance_will_travel'].forEach((k) => {
         if (payload[k]) payload[k] = parseFloat(payload[k])
@@ -211,8 +251,29 @@ export default function CreateListing() {
       }
       if (form.skills)    payload.skills    = form.skills.split(',').map((s) => s.trim()).filter(Boolean)
       if (form.languages) payload.languages = form.languages.split(',').map((s) => s.trim()).filter(Boolean)
-      const listing = await createListing(payload)
-      navigate(`/listings/${listing.listing_id}`)
+      if (form.type === 'product') {
+        const marketplaceCategory = {
+          animal_feed: 'feed',
+          medicine: 'vet_medicine',
+          irrigation: 'other',
+          organic: 'other',
+        }[form.category] || form.category
+        await createProduct({
+          title: form.title,
+          category: marketplaceCategory,
+          description: form.description,
+          price: parseFloat(form.price),
+          images: imageUrls,
+          brand: form.brand,
+          stock: form.stock_available ? parseInt(form.stock_available, 10) : 0,
+          unit: form.quantity_unit || 'piece',
+          status: 'active',
+        })
+        navigate('/marketplace')
+      } else {
+        const listing = await createListing(payload)
+        navigate(`/listings/${listing.listing_id}`)
+      }
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
   }
@@ -253,14 +314,11 @@ export default function CreateListing() {
               <option value="rent">🔄 Rent / Lease</option>
               <option value="sell">🏷 Sell</option>
             </SelectField>
-            <SelectField label="Category" value={form.category} onChange={set('category')}>
+            <SelectField label="Category" value={form.category} onChange={e => setCategory(e.target.value)}>
               <option value="">General</option>
-              {form.type === 'equipment' && <>
-                <option value="tractor">Tractor</option>
-                <option value="harvester">Harvester</option>
-                <option value="pump">Water Pump</option>
-                <option value="sprayer">Sprayer</option>
-              </>}
+              {form.type === 'equipment' && EQUIPMENT_CATEGORIES.map(category => (
+                <option key={category.value} value={category.value}>{category.label}</option>
+              ))}
               {form.type === 'land' && <>
                 <option value="agricultural">Agricultural</option>
                 <option value="orchard">Orchard</option>
@@ -285,17 +343,14 @@ export default function CreateListing() {
                   <option value="sell">🏷 Sell</option>
                 </SelectField>
               )}
-              <SelectField label="Category" value={form.category} onChange={set('category')}>
+              <SelectField label="Category" value={form.category} onChange={e => setCategory(e.target.value)}>
                 <option value="">Select Category</option>
                 {role === 'dealer'
                   ? PRODUCT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)
                   : form.type === 'equipment'
-                    ? <>
-                        <option value="tractor">Tractor</option>
-                        <option value="harvester">Harvester</option>
-                        <option value="pump">Water Pump</option>
-                        <option value="sprayer">Sprayer</option>
-                      </>
+                    ? EQUIPMENT_CATEGORIES.map(category => (
+                        <option key={category.value} value={category.value}>{category.label}</option>
+                      ))
                     : <>
                         <option value="dairy">Dairy</option>
                         <option value="draught">Draught</option>
@@ -334,11 +389,11 @@ export default function CreateListing() {
           )}
         </Section>
 
-        {/* ── Location (non-labor only) ── */}
-        {!isLabor && (
+        {/* ── Location ── */}
+        {!isLabor && (form.type !== 'product' || showProductLocation) && (
           <Section title="Location">
             <Grid>
-              <Input label="Village / City *" type="text" value={form.location} onChange={set('location')} required />
+              <Input label={locationRequired ? 'Village / City *' : 'Pickup Location (optional)'} type="text" value={form.location} onChange={set('location')} required={locationRequired} />
               <Input label="State" type="text" value={form.state} onChange={set('state')} />
               <Input label="Pincode" type="text" value={form.pincode} onChange={set('pincode')} maxLength={6} />
             </Grid>
@@ -351,21 +406,23 @@ export default function CreateListing() {
             <Grid>
               <Input label="Brand / Manufacturer" type="text" value={form.manufacturer} onChange={set('manufacturer')} />
               <Input label="Model" type="text" value={form.equipment_model} onChange={set('equipment_model')} />
-              <Input label="Year" type="number" value={form.year} onChange={set('year')} />
-              <Input label="Horsepower (HP)" type="number" value={form.horsepower} onChange={set('horsepower')} />
-              <SelectField label="Fuel Type" value={form.fuel_type} onChange={set('fuel_type')}>
-                <option value="">Select</option>
-                <option value="diesel">Diesel</option>
-                <option value="petrol">Petrol</option>
-                <option value="electric">Electric</option>
-              </SelectField>
+              {(isTractor || isHarvester) && <Input label="Year" type="number" value={form.year} onChange={set('year')} />}
+              {isTractor && <Input label="Horsepower (HP)" type="number" value={form.horsepower} onChange={set('horsepower')} />}
+              {(isTractor || isHarvester || isPump) && (
+                <SelectField label="Fuel Type" value={form.fuel_type} onChange={set('fuel_type')}>
+                  <option value="">Select</option>
+                  <option value="diesel">Diesel</option>
+                  <option value="petrol">Petrol</option>
+                  <option value="electric">Electric</option>
+                </SelectField>
+              )}
               <SelectField label="Condition" value={form.equipment_condition} onChange={set('equipment_condition')}>
                 <option value="excellent">Excellent</option>
                 <option value="good">Good</option>
                 <option value="fair">Fair</option>
                 <option value="needs_repair">Needs Repair</option>
               </SelectField>
-              <Input label="Hours Used" type="number" value={form.hours_used} onChange={set('hours_used')} />
+              {(isTractor || isHarvester || isPump) && <Input label="Hours Used" type="number" value={form.hours_used} onChange={set('hours_used')} />}
             </Grid>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <Checkbox label="Operator Included" checked={form.operator_included} onChange={set('operator_included')} />
@@ -443,23 +500,27 @@ export default function CreateListing() {
         {/* ── Product (Seller) ── */}
         {form.type === 'product' && (
           <Section title="Product Details">
-            <Grid>
-              <Input label="Brand / Manufacturer" type="text" value={form.brand} onChange={set('brand')} />
-              <Input label="Stock Available" type="number" value={form.stock_available} onChange={set('stock_available')} />
-              <Input label="Quantity per Unit" type="number" value={form.quantity} onChange={set('quantity')} />
-              <SelectField label="Quantity Unit" value={form.quantity_unit} onChange={set('quantity_unit')}>
-                <option value="">Select</option>
-                <option value="kg">kg</option>
-                <option value="gram">gram</option>
-                <option value="litre">litre</option>
-                <option value="ml">ml</option>
-                <option value="packet">packet</option>
-                <option value="bag">bag (50kg)</option>
-                <option value="box">box</option>
-                <option value="piece">piece</option>
-              </SelectField>
-              <Input label="Expiry Date" type="date" value={form.expiry_date} onChange={set('expiry_date')} />
-            </Grid>
+            {!productCategory ? (
+              <p style={{ color: '#64748b', fontSize: '13px' }}>Choose a product category to see its listing fields.</p>
+            ) : (
+              <Grid>
+                <Input label="Brand / Manufacturer" type="text" value={form.brand} onChange={set('brand')} />
+                <Input label="Stock Available" type="number" value={form.stock_available} onChange={set('stock_available')} min="0" />
+                <Input label="Pack Size / Quantity" type="number" value={form.quantity} onChange={set('quantity')} min="0" />
+                <SelectField label="Pack Unit" value={form.quantity_unit} onChange={set('quantity_unit')}>
+                  <option value="">Select</option>
+                  <option value="kg">kg</option>
+                  <option value="gram">gram</option>
+                  <option value="litre">litre</option>
+                  <option value="ml">ml</option>
+                  <option value="packet">packet</option>
+                  <option value="bag">bag (50kg)</option>
+                  <option value="box">box</option>
+                  <option value="piece">piece</option>
+                </SelectField>
+                {productCategory.expiry && <Input label="Expiry Date" type="date" value={form.expiry_date} onChange={set('expiry_date')} />}
+              </Grid>
+            )}
           </Section>
         )}
 

@@ -1,7 +1,9 @@
 // src/components/common/NotificationToast.jsx
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { markRead } from '../../lib/notifications'
 
 const TYPE_ICON = {
   booking_request:   '📥',
@@ -12,13 +14,14 @@ const TYPE_ICON = {
   crop_interest:     '🤝',
   crop_accepted:     '✅',
   crop_rejected:     '❌',
+  message_received:  '💬',
   default:           '🔔',
 }
 
 export default function NotificationToast() {
   const { user } = useAuth()
   const [toasts, setToasts] = useState([])
-  const channelRef = useRef(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!user) return
@@ -37,18 +40,29 @@ export default function NotificationToast() {
         (payload) => {
           const n = payload.new
           const id = Date.now()
-          setToasts(prev => [...prev, { id, title: n.title, message: n.message, type: n.type }])
+          setToasts(prev => [...prev, { id, notificationId: n.id, title: n.title, message: n.message, type: n.type, data: n.data }])
           // auto-dismiss after 5s
           setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000)
         }
       )
       .subscribe()
 
-    channelRef.current = channel
     return () => { supabase.removeChannel(channel) }
   }, [user])
 
   if (toasts.length === 0) return null
+
+  async function openToast(toast) {
+    setToasts(prev => prev.filter(item => item.id !== toast.id))
+    if (toast.notificationId) await markRead(toast.notificationId)
+    if (toast.data?.booking_id) {
+      navigate(`/chat?booking_id=${encodeURIComponent(toast.data.booking_id)}`)
+    } else if (toast.data?.chat_id) {
+      navigate(`/chat?chat_id=${encodeURIComponent(toast.data.chat_id)}`)
+    } else {
+      navigate('/dashboard')
+    }
+  }
 
   return (
     <div style={{
@@ -78,7 +92,15 @@ export default function NotificationToast() {
             backdropFilter: 'blur(20px)',
             cursor: 'pointer',
           }}
-          onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+          onClick={() => openToast(t).catch(error => {
+            console.error('Could not open notification:', error)
+            setToasts(prev => [...prev, {
+              id: Date.now(),
+              title: 'Could not open notification',
+              message: error.message || 'Please try again.',
+              type: 'default',
+            }])
+          })}
         >
           <span style={{ fontSize: '22px', flexShrink: 0, marginTop: '1px' }}>
             {TYPE_ICON[t.type] || TYPE_ICON.default}

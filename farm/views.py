@@ -4,19 +4,26 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.core.files.base import ContentFile
 from django.conf import settings
-import cv2
-import numpy as np
 from pathlib import Path
 from uuid import uuid4
 from .models import DetectionHistory
 import os
 
-# Try importing cv2
+# Computer-vision dependencies are optional so Django can still start if a
+# platform does not have compatible ML wheels installed.
 try:
     import cv2
     CV2_AVAILABLE = True
 except ImportError:
+    cv2 = None
     CV2_AVAILABLE = False
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    np = None
+    NUMPY_AVAILABLE = False
 
 # Try importing tflite-runtime or tensorflow lite
 try:
@@ -58,16 +65,21 @@ classes = [
 @csrf_exempt
 @xframe_options_exempt
 def detect_equipment(request):
+    if request.method == 'GET':
+        return render(request, "farm/detect.html")
+    if request.method != 'POST':
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
     if not TFLITE_AVAILABLE:
         return JsonResponse({"error": "TFLite not installed on this server."}, status=503)
-    if not CV2_AVAILABLE:
-        return JsonResponse({"error": "OpenCV not installed on this server."}, status=503)
+    if not CV2_AVAILABLE or not NUMPY_AVAILABLE:
+        return JsonResponse({"error": "OpenCV or NumPy is not installed on this server."}, status=503)
 
     interpreter = get_model()
     if interpreter is None:
         return JsonResponse({"error": f"Model file not found at: {MODEL_PATH}"}, status=500)
 
-    if request.method == 'POST' and request.FILES.get('image'):
+    if request.FILES.get('image'):
         uploaded_file = request.FILES['image']
         try:
             image_bytes = uploaded_file.read()
@@ -106,7 +118,7 @@ def detect_equipment(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
-    return render(request, "farm/detect.html")
+    return JsonResponse({"error": "Image file is required."}, status=400)
 
 
 def detection_history(request):

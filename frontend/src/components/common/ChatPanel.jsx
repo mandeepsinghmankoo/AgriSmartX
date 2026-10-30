@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { getMessages, sendMessage, markMessagesRead } from '../../lib/chat'
+import { getMessages, openBookingChat, sendMessage, markMessagesRead } from '../../lib/chat'
 import { timeAgo } from '../../lib/utils'
 
 export default function ChatPanel({ booking, onClose }) {
@@ -12,29 +12,41 @@ export default function ChatPanel({ booking, onClose }) {
   const [loading, setLoading]   = useState(true)
   const [sending, setSending]   = useState(false)
   const [error, setError]       = useState('')
+  const [chatId, setChatId]     = useState(null)
   const bottomRef  = useRef(null)
   const inputRef   = useRef(null)
-
-  // Use listing_id (uuid) directly as the chat room ID
-  const chatId = booking.listing_id || null
 
   const isOwner   = user?.id === booking.owner_id
   const otherName = isOwner ? (booking.buyer_name || 'Buyer') : (booking.owner_name || 'Owner')
   const title     = booking.listing_type || booking.title || 'Listing'
 
-  // Load messages using listing_id as chatId
+  // Resolve the booking to a chats.id before loading messages.
   useEffect(() => {
-    if (!user || !chatId) {
-      setError(!chatId ? 'No listing linked to this booking.' : '')
-      setLoading(false)
-      return
-    }
+    let cancelled = false
+    setChatId(null)
+    setMessages([])
+    setError('')
     setLoading(true)
-    getMessages(chatId)
-      .then(msgs => { setMessages(msgs); markMessagesRead(chatId) })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [user, chatId])
+
+    if (!user || !booking.id) {
+      setError(!booking.id ? 'No booking linked to this chat.' : 'Sign in to open this chat.')
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+
+    openBookingChat(booking.id)
+      .then(async (roomId) => {
+        const msgs = await getMessages(roomId)
+        if (cancelled) return
+        setChatId(roomId)
+        setMessages(msgs)
+        markMessagesRead(roomId)
+      })
+      .catch(e => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
+  }, [user, booking.id])
 
   // Realtime subscription on messages for this chatId
   useEffect(() => {

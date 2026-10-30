@@ -8,7 +8,8 @@ import { getCropPosts, expressInterest, getMyInterests } from '../../lib/cropSal
 import { getMyBookings } from '../../lib/bookings'
 import { supabase } from '../../lib/supabase'
 import { formatPrice, timeAgo } from '../../lib/utils'
-import { Loader, DashboardShell, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import { Loader, DashboardShell, DashboardLoadError, StatCard, SectionTitle, NotificationsList } from './FarmerDashboard'
+import ChatPanel from '../../components/common/ChatPanel'
 
 const MARKET_CATS = [
   { id: 'seed',         label: 'Seeds',       icon: '🌱', color: '#86efac' },
@@ -131,6 +132,7 @@ export default function BuyerDashboard() {
   const [notifications, setNotifications] = useState([])
   const [tab, setTab] = useState('overview')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [bookings, setBookings] = useState([])
 
   // browse state
@@ -138,15 +140,17 @@ export default function BuyerDashboard() {
   const [listings, setListings] = useState([])
   const [cropPosts, setCropPosts] = useState([])
   const [sentIds, setSentIds] = useState(new Set())
-  const [browseLoading, setBrowseLoading] = useState(false)
+  const [browseResult, setBrowseResult] = useState({ key: null, error: '' })
   const [interestPost, setInterestPost] = useState(null)
 
   useEffect(() => {
     Promise.all([
-      getNotifications().catch(() => []),
-      getMyBookings().catch(() => []),
-    ]).then(([n, b]) => { setNotifications(n); setBookings(b) }).finally(() => setLoading(false))
-  }, [])
+      getNotifications(),
+      getMyBookings(),
+    ]).then(([n, b]) => { setNotifications(n); setBookings(b) })
+      .catch((error) => setLoadError(error.message || 'Please retry in a moment.'))
+      .finally(() => setLoading(false))
+  }, [user?.id])
 
   // Realtime: update booking status live when owner approves/rejects
   useEffect(() => {
@@ -163,23 +167,30 @@ export default function BuyerDashboard() {
   // fetch browse data when tab or type changes
   useEffect(() => {
     if (tab !== 'browse') return
-    setBrowseLoading(true)
+    let cancelled = false
+    const key = browseType
     const isCrops = browseType === 'crops'
     const isAll = browseType === 'all'
 
     Promise.all([
       // listings: fetch if not crops-only
-      (!isCrops) ? getListings(isAll ? {} : { type: browseType }).catch(() => []) : Promise.resolve([]),
+      (!isCrops) ? getListings(isAll ? {} : { type: browseType }) : Promise.resolve([]),
       // crops: fetch if crops or all
-      (isCrops || isAll) ? getCropPosts().catch(() => []) : Promise.resolve([]),
+      (isCrops || isAll) ? getCropPosts() : Promise.resolve([]),
       // my interests to mark already-sent
-      getMyInterests().catch(() => []),
+      getMyInterests(),
     ]).then(([lst, crops, myInterests]) => {
+      if (cancelled) return
       setListings(lst)
       setCropPosts(crops)
       setSentIds(new Set(myInterests.map(i => i.crop_post_id)))
-    }).finally(() => setBrowseLoading(false))
+      setBrowseResult({ key, error: '' })
+    }).catch((error) => {
+      if (!cancelled) setBrowseResult({ key, error: error.message || 'Could not load listings.' })
+    })
+    return () => { cancelled = true }
   }, [tab, browseType])
+  const browseLoading = tab === 'browse' && browseResult.key !== browseType
 
   const myRequests = bookings.filter(b => b.buyer_id === user?.id)
   const unread = notifications.filter(n => !n.is_read).length
@@ -216,6 +227,10 @@ export default function BuyerDashboard() {
       }
       tabs={TABS} tab={tab} setTab={setTab}
     >
+      <DashboardLoadError error={loadError} />
+      {tab === 'browse' && browseResult.key === browseType && browseResult.error && (
+        <p role="alert" style={{ color: '#f87171', marginBottom: '16px' }}>Listings could not be loaded: {browseResult.error}</p>
+      )}
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px' }}>
@@ -345,17 +360,7 @@ const STATUS_STYLE = {
 }
 
 function MyRequestsList({ bookings }) {
-  function openChat(b) {
-    const params = new URLSearchParams({
-      listing_id: b.listing_id || '',
-      booking_id: b.booking_id,
-      owner_id:   b.owner_id,
-      owner_name: b.owner_name || 'Owner',
-      buyer_name: b.buyer_name || 'Buyer',
-      title:      b.listing_type || 'Listing',
-    })
-    window.open(`/chat?${params}`, `chat_${b.booking_id}`, 'width=420,height=680,resizable=yes')
-  }
+  const [chatBooking, setChatBooking] = useState(null)
   if (bookings.length === 0) return (
     <div style={{ textAlign: 'center', padding: '60px 20px' }}>
       <div style={{ fontSize: '48px', marginBottom: '14px' }}>🛒</div>
@@ -397,7 +402,7 @@ function MyRequestsList({ bookings }) {
               </div>
             </div>
             <button
-              onClick={() => openChat(b)}
+              onClick={() => setChatBooking(b)}
               style={{ marginTop: '10px', width: '100%', padding: '8px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
             >
               💬 Chat with Owner
@@ -405,6 +410,7 @@ function MyRequestsList({ bookings }) {
           </div>
         )
       })}
+      {chatBooking && <ChatPanel booking={chatBooking} onClose={() => setChatBooking(null)} />}
     </div>
   )
 }
